@@ -12,12 +12,9 @@ def emotion_score(text):
     res= emotion_analyzer.predict(text)
     disgust_points = res.probas["disgust"]
     anger_points = res.probas["anger"]
-    joy_points = res.probas["joy"]
     sadness_points = res.probas["sadness"]
-    surprise_points = res.probas["surprise"]
     fear_points = res.probas["fear"]
-    other_points = res.probas["others"]
-    total_points = (disgust_points + anger_points - joy_points + sadness_points - surprise_points + fear_points - other_points)/4
+    total_points = (disgust_points + anger_points + sadness_points + fear_points)/4
     if total_points < 0:
         total_points = 0
     return total_points
