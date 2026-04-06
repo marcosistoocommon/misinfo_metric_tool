@@ -1,14 +1,11 @@
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import requests
 
 BASE_URL = "https://apihub.tanbih.org"
-PROPAGANDA_ENDPOINT = "/api/v1/propaganda-detection/en"
-TECHNIQUE_ENDPOINT = "/api/v1/propaganda-technique-detection/en"
+PROPAGANDA_ENDPOINT = "/api/v1/propaganda-text-analysis/en"
 TIMEOUT_SECONDS = 30
-API_KEY="YOUR_API_KEY"
-
+API_KEY = None  # Set your API key here if required
 
 
 def post_json(endpoint: str, payload: Dict[str, str], token: Optional[str]) -> Dict[str, Any]:
@@ -25,28 +22,21 @@ def post_json(endpoint: str, payload: Dict[str, str], token: Optional[str]) -> D
     return {"result": data}
 
 
-def _walk_values(obj: Any) -> List[Any]:
-    values: List[Any] = []
-    if isinstance(obj, dict):
-        for value in obj.values():
-            values.extend(_walk_values(value))
-    elif isinstance(obj, list):
-        for value in obj:
-            values.extend(_walk_values(value))
-    else:
-        values.append(obj)
-    return values
+def extract_propaganda_result(response_data: Dict[str, Any]) -> Dict[str, Any]:
+    if isinstance(response_data.get("result"), dict):
+        return response_data["result"]
+    return response_data
 
 
-def extract_propaganda_status(response_data: Dict[str, Any]) -> Tuple[str, Optional[float]]:
-    value = response_data["result"]
-    return value
+def normalize_confidence(confidence: Any) -> float:
+    try:
+        value = float(confidence)
+    except (TypeError, ValueError):
+        return 0.0
 
-
-def extract_techniques(response_data: Dict[str, Any]) -> List[str]:
-    string_values = [v for v in _walk_values(response_data) if isinstance(v, str)]
-    cleaned = [s.strip() for s in string_values if s and len(s.strip()) > 2]
-    return cleaned[:5]
+    if value > 1:
+        value /= 100.0
+    return max(0.0, min(1.0, value))
 
 
 def propaganda_score(text):
@@ -58,26 +48,18 @@ def propaganda_score(text):
 
     try:
         propaganda_response = post_json(PROPAGANDA_ENDPOINT, payload, API_KEY)
-        technique_response = post_json(TECHNIQUE_ENDPOINT, payload, API_KEY)
     except requests.HTTPError:
         return None
 
-    status_text= extract_propaganda_status(propaganda_response)
-    techniques = extract_techniques(technique_response)
-    propaganda_score = 0
-    technique_score = 0
-    if status_text == "propagandistic":
-        propaganda_score = 1
+    result = extract_propaganda_result(propaganda_response)
+    label = str(result.get("label", "")).strip().lower()
+    confidence = normalize_confidence(result.get("confidence", 0.0))
 
-    if techniques:
-        for technique in techniques:
-            if technique.lower()!="other" and technique.lower()!= "no-technique":
-                technique_score += 1
-            elif technique.lower() == "other":
-                technique_score += 0.5
-
-    total_score = propaganda_score*0.5 + technique_score/techniques.__len__()*0.5 if techniques else 0
-    return total_score
-
-print(propaganda_score("The government is hiding the truth about the pandemic and is using propaganda to manipulate the public."))
+    if label == "propaganda":
+        return confidence
+    if label == "not-propaganda":
+        return 1.0 - confidence
+    return None
+if __name__ == "__main__":
+    print(propaganda_score("The government is hiding the truth about the pandemic and is using propaganda to manipulate the public."))
 

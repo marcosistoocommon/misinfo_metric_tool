@@ -22,6 +22,16 @@ def fallacy_score(text):
 
     _, ranking = torch.topk(scores, k=scores.shape[0])
     ranking = ranking.tolist()
-
-    score = scores[ranking[0]].item()
+    miscpos = model.config.label2id["miscellaneous"]
+    score = scores[ranking[0]].item()-scores[miscpos].item()
+    if score < 0:
+        score = 0
     return score
+
+def main():
+    input_text = input("Enter the text to analyze for fallacies: ")
+    score = fallacy_score(input_text)
+    print(f"Fallacy score: {score:.4f}")
+
+if __name__ == "__main__":
+    main()
