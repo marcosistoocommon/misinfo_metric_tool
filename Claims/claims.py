@@ -43,29 +43,3 @@ def process_output_clf(outputs_clf, text):
 # ============================================================================
 # MODEL 2: CLAIM VERIFICATION (_ver) - Google Fact Check API
 # ============================================================================
-
-
-# ============================================================================
-# TEST EXAMPLE
-# ============================================================================
-
-text = "Prime Minister Pedro Sánchez is leading the spanish government."
-
-# Classification
-inputs_clf = tokenizer_clf(text, return_tensors="pt")
-outputs_clf = model_clf(**inputs_clf)
-result_clf = process_output_clf(outputs_clf, text)
-
-
-# Combined result
-combined_result = {**result_clf}
-
-print("=" * 60)
-print("CLAIM CLASSIFICATION (_clf):")
-print(f"  Text: {combined_result['text']}")
-print(f"  Predicted Class: {combined_result['predicted_class_clf']}")
-print(f"  Confidence: {combined_result['confidence_clf']:.4f}")
-print(f"  Probabilities: {combined_result['probabilities_clf']}")
-print(f"  Logits: {combined_result['logits_clf']}")
-print()
-print("=" * 60)

@@ -211,7 +211,7 @@ def main():
     else:
         misinfo_score = patterns_and_tone_score(input_text)
 
-    misinfo_score = misinfo_score + float(context) * 0.1 + float(veracity) * 0.35
+    misinfo_score = misinfo_score + float(context) * 0.1 + float(veracity) * 0.3
     if args.debug:
         print("Pattern and tone component values:")
         for key, value in details.items():

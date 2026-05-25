@@ -20,8 +20,12 @@ def translate_to_english(text):
 def preprocess(text):
     new_text = []
     for t in text.split(" "):
-        t = '@user' if t.startswith('@') and len(t) > 1 else t
-        t = 'http' if t.startswith('http') else t
+        if t.startswith('@'):
+            t = t[1:]
+            if not t:
+                continue
+        elif t.startswith('http'):
+            t = 'link'
         new_text.append(t)
     return " ".join(new_text)
 
