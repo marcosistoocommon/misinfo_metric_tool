@@ -25,15 +25,19 @@ import argparse
 weights = [0.25, 0.1, 0.3, 0.15, 0.2]
 bias_weight, violence_weight, propaganda_weight, emotion_weight, fallacy_weight = weights
 
-def patterns_and_tone_score(input_text, debug=False):
+def patterns_and_tone_score(input_text, debug=False, progress_callback=None):
+    if progress_callback:
+        progress_callback("normalizing_text")
     text = translate_and_preprocess(input_text)
-    bias = bias_value(text)
-    violence = violence_value(text)
-    propaganda = propaganda_score(text)
-    tone = tone_value(text)
-    emotion = emotion_score(text)
-    hate_speech = hate_speech_value(text)
-    fallacy = fallacy_score(text)
+    if progress_callback:
+        progress_callback("analyzing_patterns")
+    bias = bias_value(text) or 0.0
+    violence = violence_value(text) or 0.0
+    propaganda = propaganda_score(text) or 0.0
+    tone = tone_value(text) or 0.0
+    emotion = emotion_score(text) or 0.0
+    hate_speech = hate_speech_value(text) or 0.0
+    fallacy = fallacy_score(text) or 0.0
     misinfo_score = (bias * bias_weight + (violence + hate_speech)/2 * violence_weight + propaganda * propaganda_weight + emotion * emotion_weight + fallacy * fallacy_weight)*0.45+ tone * 0.15
     if debug:
         details = {
@@ -48,7 +52,32 @@ def patterns_and_tone_score(input_text, debug=False):
         return misinfo_score, details
     return misinfo_score
 
-def main():
+def calculate_misinformation_score(input_text, context, veracity, debug=False, progress_callback=None):
+    if debug:
+        misinfo_score, details = patterns_and_tone_score(input_text, debug=True, progress_callback=progress_callback)
+    else:
+        misinfo_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
+        details = None
+
+    if progress_callback:
+        progress_callback("computing_score")
+    misinfo_score = misinfo_score + float(context) * 0.1 + float(veracity) * 0.3
+
+    if debug:
+        return misinfo_score, details
+    return misinfo_score
+
+
+def main(input_text=None, context=None, veracity=None, debug=False, progress_callback=None):
+    if input_text is not None and context is not None and veracity is not None:
+        return calculate_misinformation_score(
+            input_text,
+            context,
+            veracity,
+            debug=debug,
+            progress_callback=progress_callback,
+        )
+
     parser = argparse.ArgumentParser(description="Calculate misinformation score")
     parser.add_argument(
         "--debug",
@@ -206,16 +235,15 @@ def main():
     context = input("Enter the value of the context: ")
     veracity = input("Enter the value of the veracity: ")
 
-    if args.debug:
-        misinfo_score, details = patterns_and_tone_score(input_text, debug=True)
-    else:
-        misinfo_score = patterns_and_tone_score(input_text)
+    result = calculate_misinformation_score(input_text, context, veracity, debug=args.debug)
 
-    misinfo_score = misinfo_score + float(context) * 0.1 + float(veracity) * 0.3
     if args.debug:
+        misinfo_score, details = result
         print("Pattern and tone component values:")
         for key, value in details.items():
             print(f"- {key}: {value:.4f}")
+    else:
+        misinfo_score = result
     print(f"Misinformation Score: {misinfo_score:.4f}")
 
 

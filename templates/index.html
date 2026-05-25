@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="{{ lang }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ text.page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <div>
+          <p class="eyebrow">{{ text.prototype }}</p>
+          <h1 class="site-title">{{ text.page_title }}</h1>
+        </div>
+        <label class="language-switch">
+          <span>{{ text.language_label }}</span>
+          <select id="language" name="language">
+            <option value="en" {% if lang == 'en' %}selected{% endif %}>{{ text.option_en }}</option>
+            <option value="es" {% if lang == 'es' %}selected{% endif %}>{{ text.option_es }}</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <div class="page-shell">
+      <section class="hero-card">
+        <h2 class="card-title">{{ text.headline }}</h2>
+        <p class="lede">{{ text.lede }}</p>
+
+        <form id="analysis-form" class="analysis-form" action="{{ url_for('analyze') }}" method="post" novalidate data-lang="{{ lang }}">
+          <input type="hidden" name="lang" id="lang-input" value="{{ lang }}">
+          <label>
+            <span>{{ text.context_label }}</span>
+            <input
+              type="number"
+              name="context"
+              min="0"
+              max="1"
+              step="0.01"
+              required
+              value="{{ form_values.get('context', '') }}"
+            >
+            <strong id="context-error" class="field-error">{{ errors.get('context', '') }}</strong>
+          </label>
+
+          <label>
+            <span>{{ text.veracity_label }}</span>
+            <input
+              type="number"
+              name="veracity"
+              min="0"
+              max="1"
+              step="0.01"
+              required
+              value="{{ form_values.get('veracity', '') }}"
+            >
+            <strong id="veracity-error" class="field-error">{{ errors.get('veracity', '') }}</strong>
+          </label>
+
+          <label class="full-width">
+            <span>{{ text.message_label }}</span>
+            <textarea name="message" rows="7" required placeholder="{{ text.message_placeholder }}">{{ form_values.get('message', '') }}</textarea>
+            <strong id="message-error" class="field-error">{{ errors.get('message', '') }}</strong>
+          </label>
+
+          <button type="submit">{{ text.submit }}</button>
+        </form>
+      </section>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay" aria-hidden="true">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <h2>{{ text.loading_title }}</h2>
+        <p>{{ text.loading_subtitle }}</p>
+
+        <div class="loading-steps" aria-live="polite">
+          {% for step in text.steps %}
+          <div class="loading-step{% if loop.first %} is-active{% endif %}" data-step-index="{{ loop.index0 }}">
+            <span class="step-dot"></span>
+            <span class="step-text">{{ step }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('analysis-form');
+      const overlay = document.getElementById('loading-overlay');
+      const languageSelect = document.getElementById('language');
+      const languageInput = document.getElementById('lang-input');
+      const loadingSteps = Array.from(document.querySelectorAll('.loading-step'));
+      const errorFields = {
+        context: document.getElementById('context-error'),
+        veracity: document.getElementById('veracity-error'),
+        message: document.getElementById('message-error'),
+      };
+
+      const setLanguage = (language) => {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('lang', language);
+        window.location.href = currentUrl.toString();
+      };
+
+      languageSelect.addEventListener('change', () => {
+        setLanguage(languageSelect.value);
+      });
+
+      const clearErrors = () => {
+        Object.values(errorFields).forEach((element) => {
+          element.textContent = '';
+        });
+      };
+
+      const showLoadingStep = (index, done = false) => {
+        loadingSteps.forEach((step, stepIndex) => {
+          step.classList.toggle('is-complete', done || stepIndex < index);
+          step.classList.toggle('is-active', !done && stepIndex === index);
+        });
+      };
+
+      const sleep = (duration) => new Promise((resolve) => window.setTimeout(resolve, duration));
+
+      const pollProgress = async (statusUrl) => {
+        while (true) {
+          const response = await fetch(statusUrl, { cache: 'no-store' });
+          const payload = await response.json();
+
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || 'Unable to read analysis progress.');
+          }
+
+          showLoadingStep(payload.current_step, payload.done);
+
+          if (payload.done) {
+            window.location.href = payload.redirect;
+            return;
+          }
+
+          await sleep(350);
+        }
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+
+        clearErrors();
+        languageInput.value = languageSelect.value;
+        document.body.classList.add('is-loading');
+        overlay.classList.add('is-visible');
+        showLoadingStep(0);
+
+        const formData = new FormData(form);
+
+        try {
+          const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          });
+
+          const payload = await response.json();
+
+          if (!response.ok) {
+            document.body.classList.remove('is-loading');
+            overlay.classList.remove('is-visible');
+            if (payload.errors) {
+              Object.entries(payload.errors).forEach(([field, message]) => {
+                if (errorFields[field]) {
+                  errorFields[field].textContent = message;
+                }
+              });
+            }
+            return;
+          }
+
+          showLoadingStep(payload.current_step || 1, false);
+          await pollProgress(payload.status_url);
+        } catch (error) {
+          document.body.classList.remove('is-loading');
+          overlay.classList.remove('is-visible');
+          errorFields.message.textContent = 'Unable to complete the analysis.';
+        }
+      });
+    </script>
+  </body>
+</html>

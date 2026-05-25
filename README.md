@@ -20,6 +20,16 @@ Project for misinformation analysis in text.
 python .\Patterns\propaganda.py
 ```
 
+## Web prototype
+
+Run the web app with:
+
+```bash
+python app.py
+```
+
+Then open the local Flask address shown in the terminal.
+
 ## GitHub upload
 
 The repository is configured with a `.gitignore` to exclude local environment and cache files.

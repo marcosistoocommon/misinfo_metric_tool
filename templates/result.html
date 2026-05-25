@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="{{ lang }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ text.page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <div>
+          <p class="eyebrow">{{ text.prototype }}</p>
+          <h1 class="site-title">{{ text.page_title }}</h1>
+        </div>
+        <label class="language-switch">
+          <span>{{ text.language_label }}</span>
+          <select id="language" name="language">
+            <option value="en" {% if lang == 'en' %}selected{% endif %}>{{ text.option_en }}</option>
+            <option value="es" {% if lang == 'es' %}selected{% endif %}>{{ text.option_es }}</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <div class="page-shell result-shell">
+      <section class="hero-card result-card">
+        <h2 class="card-title">{{ text.result_title }}</h2>
+
+        <div class="score-rail">
+          <span class="score-label">{{ text.score_label }}</span>
+          <span class="score-value">{{ score }}</span>
+        </div>
+
+        <div class="result-grid">
+          <article>
+            <h2>{{ text.original_message }}</h2>
+            <p>{{ message }}</p>
+          </article>
+
+          <article>
+            <h2>{{ text.inputs_used }}</h2>
+            <p>{{ text.context_line }}: {{ '%.2f'|format(context) }}</p>
+            <p>{{ text.veracity_line }}: {{ '%.2f'|format(veracity) }}</p>
+          </article>
+        </div>
+
+        <a class="secondary-link" href="{{ url_for('index', lang=lang) }}">{{ text.another }}</a>
+      </section>
+    </div>
+
+    <script>
+      const languageSelect = document.getElementById('language');
+
+      languageSelect.addEventListener('change', () => {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('lang', languageSelect.value);
+        window.location.href = currentUrl.toString();
+      });
+    </script>
+  </body>
+</html>
