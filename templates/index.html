@@ -28,6 +28,12 @@
         <h2 class="card-title">{{ text.headline }}</h2>
         <p class="lede">{{ text.lede }}</p>
 
+        {% if backend_error %}
+        <div class="backend-alert" role="alert">
+          <strong>{{ text.backend_error_label }}:</strong> {{ backend_error }}
+        </div>
+        {% endif %}
+
         <form id="analysis-form" class="analysis-form" action="{{ url_for('analyze') }}" method="post" novalidate data-lang="{{ lang }}">
           <input type="hidden" name="lang" id="lang-input" value="{{ lang }}">
           <label>
@@ -42,20 +48,6 @@
               value="{{ form_values.get('context', '') }}"
             >
             <strong id="context-error" class="field-error">{{ errors.get('context', '') }}</strong>
-          </label>
-
-          <label>
-            <span>{{ text.veracity_label }}</span>
-            <input
-              type="number"
-              name="veracity"
-              min="0"
-              max="1"
-              step="0.01"
-              required
-              value="{{ form_values.get('veracity', '') }}"
-            >
-            <strong id="veracity-error" class="field-error">{{ errors.get('veracity', '') }}</strong>
           </label>
 
           <label class="full-width">
@@ -94,7 +86,6 @@
       const loadingSteps = Array.from(document.querySelectorAll('.loading-step'));
       const errorFields = {
         context: document.getElementById('context-error'),
-        veracity: document.getElementById('veracity-error'),
         message: document.getElementById('message-error'),
       };
 
@@ -130,6 +121,10 @@
 
           if (!response.ok || !payload.ok) {
             throw new Error(payload.error || 'Unable to read analysis progress.');
+          }
+
+          if (payload.error) {
+            throw new Error(payload.error);
           }
 
           showLoadingStep(payload.current_step, payload.done);
@@ -174,6 +169,9 @@
             document.body.classList.remove('is-loading');
             overlay.classList.remove('is-visible');
             if (payload.errors) {
+              if (payload.errors.backend) {
+                errorFields.message.textContent = payload.errors.backend;
+              }
               Object.entries(payload.errors).forEach(([field, message]) => {
                 if (errorFields[field]) {
                   errorFields[field].textContent = message;
@@ -188,7 +186,7 @@
         } catch (error) {
           document.body.classList.remove('is-loading');
           overlay.classList.remove('is-visible');
-          errorFields.message.textContent = 'Unable to complete the analysis.';
+          errorFields.message.textContent = error.message || 'Unable to complete the analysis.';
         }
       });
     </script>

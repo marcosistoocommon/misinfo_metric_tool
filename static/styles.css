@@ -221,6 +221,21 @@ button {
   font: 700 0.85rem/1.2 "Trebuchet MS", sans-serif;
 }
 
+.backend-alert {
+  margin: 0 0 24px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(180, 35, 24, 0.22);
+  background: rgba(180, 35, 24, 0.08);
+  color: #8f1d14;
+  font: 700 0.95rem/1.5 "Trebuchet MS", sans-serif;
+}
+
+.backend-alert strong {
+  display: inline-block;
+  margin-right: 6px;
+}
+
 .loading-overlay {
   position: fixed;
   inset: 0;

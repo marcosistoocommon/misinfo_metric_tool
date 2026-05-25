@@ -21,6 +21,7 @@ from Tone.tone import tone_value
 from Patterns.emotion import emotion_score, hate_speech_value
 from Patterns.fallacies import fallacy_score
 import argparse
+from Claims.verification import false_confidence
 
 weights = [0.25, 0.1, 0.3, 0.15, 0.2]
 bias_weight, violence_weight, propaganda_weight, emotion_weight, fallacy_weight = weights
@@ -38,7 +39,7 @@ def patterns_and_tone_score(input_text, debug=False, progress_callback=None):
     emotion = emotion_score(text) or 0.0
     hate_speech = hate_speech_value(text) or 0.0
     fallacy = fallacy_score(text) or 0.0
-    misinfo_score = (bias * bias_weight + (violence + hate_speech)/2 * violence_weight + propaganda * propaganda_weight + emotion * emotion_weight + fallacy * fallacy_weight)*0.45+ tone * 0.15
+    patterns_score = bias * bias_weight + (violence + hate_speech) / 2 * violence_weight + propaganda * propaganda_weight + emotion * emotion_weight + fallacy * fallacy_weight
     if debug:
         details = {
             "bias": bias,
@@ -49,23 +50,44 @@ def patterns_and_tone_score(input_text, debug=False, progress_callback=None):
             "fallacy": fallacy,
             "tone": tone,
         }
-        return misinfo_score, details
-    return misinfo_score
+        return patterns_score, tone, details
+    return patterns_score, tone
 
-def calculate_misinformation_score(input_text, context, veracity, debug=False, progress_callback=None):
+def analyze_message(input_text, context, debug=False, progress_callback=None):
     if debug:
-        misinfo_score, details = patterns_and_tone_score(input_text, debug=True, progress_callback=progress_callback)
+        patterns_score, tone_score, details = patterns_and_tone_score(input_text, debug=True, progress_callback=progress_callback)
     else:
-        misinfo_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
+        patterns_score, tone_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
         details = None
 
     if progress_callback:
         progress_callback("computing_score")
-    misinfo_score = misinfo_score + float(context) * 0.1 + float(veracity) * 0.3
+
+    verification_value = false_confidence(input_text, progress_callback=progress_callback)
+    context_value = float(context)
+    score = (patterns_score * 0.45) + (tone_score * 0.15) + (context_value * 0.1) + (verification_value * 0.3)
+
+    payload = {
+        "score": score,
+        "context": context_value,
+        "verification": verification_value,
+        "patterns": patterns_score,
+        "tone": tone_score,
+    }
+
+    if progress_callback:
+        progress_callback("preparing_result")
 
     if debug:
-        return misinfo_score, details
-    return misinfo_score
+        payload["details"] = details or {}
+    return payload
+
+
+def calculate_misinformation_score(input_text, context, veracity=None, debug=False, progress_callback=None):
+    result = analyze_message(input_text, context, debug=debug, progress_callback=progress_callback)
+    if debug:
+        return result["score"], {**(result.get("details") or {}), "context": result["context"], "verification": result["verification"], "patterns": result["patterns"], "tone": result["tone"]}
+    return result["score"]
 
 
 def main(input_text=None, context=None, veracity=None, debug=False, progress_callback=None):
@@ -208,9 +230,8 @@ def main(input_text=None, context=None, veracity=None, debug=False, progress_cal
         acc_no = 0
         for i, ind_test in enumerate(data):
             context = ind_test[0]
-            veracity = ind_test[1]
             text = ind_test[2]
-            misinfo_score = patterns_and_tone_score(text) + float(context) * 0.1 + float(veracity) * 0.3
+            misinfo_score = analyze_message(text, context)["score"]
             test_scores.append(misinfo_score)
              # Progress bar
             progress = (i + 1) / len(data)

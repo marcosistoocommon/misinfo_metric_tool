@@ -27,6 +27,12 @@
       <section class="hero-card result-card">
         <h2 class="card-title">{{ text.result_title }}</h2>
 
+        {% if backend_error %}
+        <div class="backend-alert" role="alert">
+          <strong>{{ text.backend_error_label }}:</strong> {{ backend_error }}
+        </div>
+        {% endif %}
+
         <div class="score-rail">
           <span class="score-label">{{ text.score_label }}</span>
           <span class="score-value">{{ score }}</span>
@@ -41,7 +47,9 @@
           <article>
             <h2>{{ text.inputs_used }}</h2>
             <p>{{ text.context_line }}: {{ '%.2f'|format(context) }}</p>
-            <p>{{ text.veracity_line }}: {{ '%.2f'|format(veracity) }}</p>
+            <p>{{ text.verification_line }}: {{ '%.2f'|format(verification) }}</p>
+            <p>{{ text.patterns_line }}: {{ '%.2f'|format(patterns) }}</p>
+            <p>{{ text.tone_line }}: {{ '%.2f'|format(tone) }}</p>
           </article>
         </div>
 
