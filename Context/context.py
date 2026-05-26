@@ -19,6 +19,7 @@ from image_eval import evaluate_political_imagery
 from politic_eval import handle_politicalness
 from recent_eval import evaluate_event_recency
 from Claims.verification import ClaimeAIError, false_confidence, initialize_agent
+from misinfo_value import patterns_and_tone_score
 
 weights = [0.05, 0.05, 0.2, 0.3, 0.3, 0.1]
 
@@ -54,13 +55,12 @@ def _score_context_data(context):
         if follower_username:
             mutual_followers_score += handle_politicalness(follower_username) * 0.25
         if follower_description:
-            mutual_followers_score += handle_politicalness(follower_description) * 0.5
+            mutual_followers_score += patterns_and_tone_score(follower_description)[0] * 0.5
 
     if context["mutual_followers"]:
         mutual_followers_score /= (len(context["mutual_followers"]) * 3)
 
     for post in context["last_posts"]:
-        from misinfo_value import patterns_and_tone_score
 
         pattern_score, tone_score = patterns_and_tone_score(post)
         fakeness_score = false_confidence(post)
