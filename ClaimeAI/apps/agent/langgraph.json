@@ -1,0 +1,9 @@
+{
+  "python_version": "3.11",
+  "dependencies": ["."],
+  "graphs": {
+    "claim_extractor": "claim_extractor/agent.py:graph",
+    "claim_verifier": "claim_verifier/agent.py:graph",
+    "fact_checker": "fact_checker/agent.py:graph"
+  }
+}
