@@ -6,7 +6,6 @@ boundary without needing Docker or a separate process.
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import sys
 from pathlib import Path
@@ -19,8 +18,46 @@ _AGENT_READY = False
 _AGENT_ERROR = None
 
 
+
 class ClaimeAIError(RuntimeError):
 	"""Raised when the ClaimeAI backend cannot be initialized or executed."""
+
+
+def _format_external_error(exc: Exception) -> str:
+	"""Return a verbose, stable diagnostic string for upstream API failures."""
+	parts: list[str] = [f"type={exc.__class__.__name__}"]
+
+	status_code = getattr(exc, "status_code", None)
+	if status_code is None:
+		response = getattr(exc, "response", None)
+		status_code = getattr(response, "status_code", None)
+	if status_code is not None:
+		parts.append(f"status_code={status_code}")
+
+	code = getattr(exc, "code", None)
+	if code:
+		parts.append(f"code={code}")
+
+	request_id = getattr(exc, "request_id", None)
+	if request_id:
+		parts.append(f"request_id={request_id}")
+
+	message = str(exc).strip() or "<no message>"
+	parts.append(f"message={message}")
+
+	if int(status_code or 0) == 429:
+		parts.append("classification=rate_limited")
+	elif "APIConnectionError" in exc.__class__.__name__ or "Connection error" in message:
+		parts.append("classification=connection_error")
+
+	cause = exc.__cause__
+	if cause is not None:
+		parts.append(f"cause_type={cause.__class__.__name__}")
+		cause_message = str(cause).strip()
+		if cause_message:
+			parts.append(f"cause_message={cause_message}")
+
+	return ", ".join(parts)
 
 
 def claimeai_available() -> bool:
@@ -82,7 +119,7 @@ def extract_claims(text: str) -> list[str]:
 		if claim_extractor_graph is None:
 			raise ClaimeAIError("ClaimeAI claim extractor graph is not available.")
 
-		result = _run_async(claim_extractor_graph.ainvoke({"answer_text": text}))
+		result = claim_extractor_graph.invoke({"answer_text": text})
 		if not isinstance(result, dict):
 			raise ClaimeAIError("ClaimeAI claim extractor returned an invalid payload.")
 
@@ -104,10 +141,11 @@ def extract_claims(text: str) -> list[str]:
 		return claims
 	except Exception as exc:
 		global _AGENT_ERROR
-		_AGENT_ERROR = str(exc)
+		detail = _format_external_error(exc)
+		_AGENT_ERROR = detail
 		if isinstance(exc, ClaimeAIError):
 			raise
-		raise ClaimeAIError(f"Error invoking ClaimeAI claim extractor: {exc}") from exc
+		raise ClaimeAIError(f"Error invoking ClaimeAI claim extractor: {detail}") from exc
 
 
 def false_confidence(text: str, progress_callback=None) -> float:
@@ -137,10 +175,11 @@ def false_confidence(text: str, progress_callback=None) -> float:
 		return _score_from_verdicts(verdicts)
 	except Exception as exc:
 		global _AGENT_ERROR
-		_AGENT_ERROR = str(exc)
+		detail = _format_external_error(exc)
+		_AGENT_ERROR = detail
 		if isinstance(exc, ClaimeAIError):
 			raise
-		raise ClaimeAIError(f"Error invoking ClaimeAI fact checker: {exc}") from exc
+		raise ClaimeAIError(f"Error invoking ClaimeAI fact checker: {detail}") from exc
 
 
 def _verify_claims_directly(claims: list[str]) -> list[Any]:
@@ -159,7 +198,7 @@ def _verify_claims_directly(claims: list[str]) -> list[Any]:
 			"original_sentence": claim_text,
 			"original_index": index,
 		}
-		result = _run_async(claim_verifier_graph.ainvoke({"claim": claim_payload}))
+		result = claim_verifier_graph.invoke({"claim": claim_payload})
 		if not isinstance(result, dict):
 			raise ClaimeAIError("ClaimeAI claim verifier returned an invalid payload.")
 		verdict = result.get("verdict")
@@ -187,19 +226,4 @@ def _map_verdict_to_false_confidence(verdict: Any) -> float:
 	if normalized in {"supported", "true"}:
 		return 0.0
 	return 0.4  # Uncertain or unknown verdicts get a moderate false confidence
-
-
-def _run_async(coro: Any) -> Any:
-	try:
-		asyncio.get_running_loop()
-	except RuntimeError:
-		return asyncio.run(coro)
-
-	loop = asyncio.new_event_loop()
-	try:
-		return loop.run_until_complete(coro)
-	finally:
-		loop.close()
-
-
 __all__ = ["claimeai_available", "extract_claims", "false_confidence", "initialize_agent", "agent_error", "ClaimeAIError"]

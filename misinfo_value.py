@@ -59,8 +59,8 @@ def analyze_message(input_text, context, debug=False, progress_callback=None):
     else:
         patterns_score, tone_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
         details = None
-    text = translate_and_preprocess(input_text)
-    verification_value = false_confidence(text, progress_callback=progress_callback)
+    input_text = translate_and_preprocess(input_text)
+    verification_value = false_confidence(input_text, progress_callback=progress_callback)
 
     if progress_callback:
         progress_callback("computing_score")

@@ -14,6 +14,10 @@ def handle_politicalness(text):
     predicted_class_politicalness = {"is not": "non-political", "is": "political"}[
         prediction_politicalness_result["labels"][0]
     ]
-    return predicted_class_politicalness, prediction_politicalness_result["scores"][0]
+    if predicted_class_politicalness == "political":
+        return prediction_politicalness_result["scores"][0]
+    else:
+        return 1 - prediction_politicalness_result["scores"][0]
 
-print(handle_politicalness("The government has announced a new policy on climate change."))
+if __name__ == "__main__":
+    print(handle_politicalness("Penis"))

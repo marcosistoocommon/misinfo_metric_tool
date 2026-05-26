@@ -53,6 +53,7 @@
 
           <article>
             <h2>{{ text.inputs_used }}</h2>
+            <p>{{ text.url_line }}: <a href="{{ x_url }}" target="_blank" rel="noreferrer">{{ x_url }}</a></p>
             <p>{{ text.context_line }}: <span class="numeric-value {{ context_class }}">{{ '%.2f'|format(context) }}</span></p>
             <p>{{ text.verification_line }}: <span class="numeric-value {{ verification_class }}">{{ '%.2f'|format(verification) }}</span></p>
             <p>{{ text.patterns_line }}: <span class="numeric-value {{ patterns_class }}">{{ '%.2f'|format(patterns) }}</span></p>

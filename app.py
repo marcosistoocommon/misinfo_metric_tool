@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from misinfo_value import analyze_message as calculate_analysis
+from Context.context import analyze_x_url
 from Claims.verification import ClaimeAIError, agent_error, initialize_agent
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -30,30 +31,31 @@ TEXT = {
         "page_title": "Bulometer",
         "prototype": "Prototype",
         "headline": "Bulometer: Misinformation value",
-        "lede": "Enter the context value and the message. Verification now runs in the background.",
-        "context_label": "Context value",
-        "message_label": "Message",
-        "message_placeholder": "Paste the text to analyze",
-        "submit": "Analyze message",
+        "lede": "Paste an X post URL and the app will extract the post text, compute the context value, and score the message.",
+        "url_label": "X post URL",
+        "url_placeholder": "https://x.com/username/status/1234567890",
+        "submit": "Analyze X post",
         "language_label": "Language",
         "option_en": "English",
         "option_es": "Spanish",
         "loading_title": "Running analysis",
-        "loading_subtitle": "The app is evaluating the message and computing the score.",
+        "loading_subtitle": "The app is extracting the post text, evaluating the context, and computing the score.",
         "result_title": "Assigned value",
         "score_label": "Score",
-        "original_message": "Original message",
-        "inputs_used": "Component values",
+        "original_message": "Extracted message",
+        "inputs_used": "Values used",
+        "url_line": "X URL",
         "context_line": "Context",
         "verification_line": "Fakeness",
         "patterns_line": "Patterns",
         "tone_line": "Tone",
-        "another": "Analyze another message",
-        "required_message": "Message is required.",
+        "another": "Analyze another X post",
+        "required_url": "X URL is required.",
+        "url_error": "Please enter a valid X status URL.",
         "backend_error_label": "Verification backend error",
         "numeric_error": "must be a number between 0 and 1.",
         "steps": [
-            "Validating inputs",
+            "Extracting tweet text and context",
             "Analyzing patterns and tone",
             "Extracting claims",
             "Verifying claims",
@@ -65,30 +67,31 @@ TEXT = {
         "page_title": "Bulómetro",
         "prototype": "Prototipo",
         "headline": "Bulómetro: Medidor de desinformación",
-        "lede": "Introduce el valor de contexto y el mensaje. La verificación se ejecuta en segundo plano.",
-        "context_label": "Valor de contexto",
-        "message_label": "Mensaje",
-        "message_placeholder": "Pega aquí el texto a analizar",
-        "submit": "Analizar mensaje",
+        "lede": "Pega una URL de X y la aplicación extraerá el texto, calculará el contexto y puntuará el mensaje.",
+        "url_label": "URL del post de X",
+        "url_placeholder": "https://x.com/usuario/status/1234567890",
+        "submit": "Analizar post de X",
         "language_label": "Idioma",
         "option_en": "Inglés",
         "option_es": "Español",
         "loading_title": "Ejecutando el análisis",
-        "loading_subtitle": "La aplicación está evaluando el mensaje y calculando la puntuación.",
+        "loading_subtitle": "La aplicación está extrayendo el texto del post, evaluando el contexto y calculando la puntuación.",
         "result_title": "Valor asignado",
         "score_label": "Puntuación",
-        "original_message": "Mensaje original",
-        "inputs_used": "Valores de los componentes",
+        "original_message": "Mensaje extraído",
+        "inputs_used": "Valores utilizados",
+        "url_line": "URL de X",
         "context_line": "Contexto",
         "verification_line": "Falsedad",
         "patterns_line": "Patrones",
         "tone_line": "Tono",
-        "another": "Analizar otro mensaje",
-        "required_message": "El mensaje es obligatorio.",
+        "another": "Analizar otro post de X",
+        "required_url": "La URL de X es obligatoria.",
+        "url_error": "Introduce una URL de X válida.",
         "backend_error_label": "Error del backend de verificación",
         "numeric_error": "debe ser un número entre 0 y 1.",
         "steps": [
-            "Validando los datos",
+            "Extrayendo el texto y el contexto",
             "Analizando patrones y tono",
             "Extrayendo claims",
             "Verificando claims",
@@ -102,13 +105,14 @@ RESULT_CACHE = {}
 JOB_CACHE = {}
 JOB_LOCK = Lock()
 STAGE_INDEX = {
+    "extracting_context": 0,
     "normalizing_text": 1,
     "analyzing_patterns": 1,
     "extracting_claims": 2,
     "verifying_claims": 3,
+    "aggregating_verdict": 3,
     "computing_score": 4,
     "preparing_result": 5,
-    "aggregating_verdict": 4,
 }
 
 
@@ -119,11 +123,15 @@ def update_job(token, **updates):
             job.update(updates)
 
 
-def run_analysis_job(token, message, context_value, lang, redirect_url):
+def run_analysis_job(token, x_url, lang, redirect_url):
     def progress_callback(stage):
         update_job(token, current_step=STAGE_INDEX.get(stage, 1))
 
     try:
+        analysis = analyze_x_url(x_url, progress_callback=progress_callback)
+        message = analysis["message"]
+        context_value = analysis["context"]
+
         result = calculate_analysis(
             input_text=message,
             context=context_value,
@@ -131,6 +139,7 @@ def run_analysis_job(token, message, context_value, lang, redirect_url):
         )
 
         payload = {
+            "x_url": x_url,
             "message": message,
             "context": result["context"],
             "verification": result["verification"],
@@ -197,20 +206,16 @@ def analyze():
     text = ui(lang)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
-    message = (request.form.get("message") or "").strip()
-    context_raw = (request.form.get("context") or "").strip()
+    x_url = (request.form.get("x_url") or "").strip()
 
     errors = {}
-    context_value, context_error = parse_bounded_float(context_raw, text["context_label"], lang)
-
-    if not message:
-        errors["message"] = text["required_message"]
-    if context_error:
-        errors["context"] = context_error
+    if not x_url:
+        errors["x_url"] = text["required_url"]
+    elif "twitter.com" not in x_url and "x.com" not in x_url:
+        errors["x_url"] = text["url_error"]
 
     form_values = {
-        "message": message,
-        "context": context_raw,
+        "x_url": x_url,
     }
 
     if CLAIMEAI_ERROR:
@@ -222,29 +227,37 @@ def analyze():
         return render_template("index.html", text=text, lang=lang, form_values=form_values, errors=errors, backend_error=CLAIMEAI_ERROR), 400
 
     if not is_ajax:
-        result = calculate_analysis(input_text=message, context=context_value)
+        try:
+            analysis = analyze_x_url(x_url)
+            if not isinstance(analysis, dict):
+                raise RuntimeError(str(analysis))
 
-        token = uuid4().hex
-        RESULT_CACHE[token] = {
-            "message": message,
-            "context": result["context"],
-            "verification": result["verification"],
-            "patterns": result["patterns"],
-            "tone": result["tone"],
-            "score": f"{result['score']:.4f}",
-            "lang": lang,
-        }
-        return redirect(url_for("result", token=token, lang=lang))
+            result = calculate_analysis(input_text=analysis["message"], context=analysis["context"])
+
+            token = uuid4().hex
+            RESULT_CACHE[token] = {
+                "x_url": x_url,
+                "message": analysis["message"],
+                "context": result["context"],
+                "verification": result["verification"],
+                "patterns": result["patterns"],
+                "tone": result["tone"],
+                "score": f"{result['score']:.4f}",
+                "lang": lang,
+            }
+            return redirect(url_for("result", token=token, lang=lang))
+        except Exception as exc:
+            errors["backend"] = str(exc)
+            return render_template("index.html", text=text, lang=lang, form_values=form_values, errors=errors, backend_error=CLAIMEAI_ERROR), 400
 
     token = uuid4().hex
     redirect_url = url_for("result", token=token, lang=lang)
 
     with JOB_LOCK:
         JOB_CACHE[token] = {
-            "message": message,
-            "context": context_value,
+            "x_url": x_url,
             "lang": lang,
-            "current_step": 1,
+            "current_step": 0,
             "done": False,
             "error": None,
             "redirect": redirect_url,
@@ -252,7 +265,7 @@ def analyze():
 
     Thread(
         target=run_analysis_job,
-        args=(token, message, context_value, lang, redirect_url),
+        args=(token, x_url, lang, redirect_url),
         daemon=True,
     ).start()
 
@@ -262,7 +275,7 @@ def analyze():
             "token": token,
             "status_url": url_for("progress", token=token, lang=lang),
             "redirect": redirect_url,
-            "current_step": 1,
+            "current_step": 0,
             "total_steps": len(text["steps"]),
         }
     )
@@ -311,6 +324,7 @@ def result(token):
         text=text,
         lang=lang,
         message=payload["message"],
+        x_url=payload.get("x_url"),
         context=payload["context"],
         verification=payload["verification"],
         patterns=payload["patterns"],

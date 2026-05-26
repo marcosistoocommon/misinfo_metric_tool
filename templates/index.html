@@ -37,24 +37,16 @@
 
         <form id="analysis-form" class="analysis-form" action="{{ url_for('analyze') }}" method="post" novalidate data-lang="{{ lang }}">
           <input type="hidden" name="lang" id="lang-input" value="{{ lang }}">
-          <label>
-            <span>{{ text.context_label }}</span>
-            <input
-              type="number"
-              name="context"
-              min="0"
-              max="1"
-              step="0.01"
-              required
-              value="{{ form_values.get('context', '') }}"
-            >
-            <strong id="context-error" class="field-error">{{ errors.get('context', '') }}</strong>
-          </label>
-
           <label class="full-width">
-            <span>{{ text.message_label }}</span>
-            <textarea name="message" rows="7" required placeholder="{{ text.message_placeholder }}">{{ form_values.get('message', '') }}</textarea>
-            <strong id="message-error" class="field-error">{{ errors.get('message', '') }}</strong>
+            <span>{{ text.url_label }}</span>
+            <input
+              type="url"
+              name="x_url"
+              required
+              placeholder="{{ text.url_placeholder }}"
+              value="{{ form_values.get('x_url', '') }}"
+            >
+            <strong id="x-url-error" class="field-error">{{ errors.get('x_url', '') }}</strong>
           </label>
 
           <button type="submit">{{ text.submit }}</button>
@@ -86,8 +78,7 @@
       const languageInput = document.getElementById('lang-input');
       const loadingSteps = Array.from(document.querySelectorAll('.loading-step'));
       const errorFields = {
-        context: document.getElementById('context-error'),
-        message: document.getElementById('message-error'),
+        x_url: document.getElementById('x-url-error'),
       };
 
       const setLanguage = (language) => {
@@ -171,7 +162,7 @@
             overlay.classList.remove('is-visible');
             if (payload.errors) {
               if (payload.errors.backend) {
-                errorFields.message.textContent = payload.errors.backend;
+                errorFields.x_url.textContent = payload.errors.backend;
               }
               Object.entries(payload.errors).forEach(([field, message]) => {
                 if (errorFields[field]) {
@@ -182,12 +173,12 @@
             return;
           }
 
-          showLoadingStep(payload.current_step || 1, false);
+          showLoadingStep(payload.current_step ?? 0, false);
           await pollProgress(payload.status_url);
         } catch (error) {
           document.body.classList.remove('is-loading');
           overlay.classList.remove('is-visible');
-          errorFields.message.textContent = error.message || 'Unable to complete the analysis.';
+          errorFields.x_url.textContent = error.message || 'Unable to complete the analysis.';
         }
       });
     </script>

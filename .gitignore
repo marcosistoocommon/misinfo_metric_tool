@@ -9,6 +9,7 @@ venv/
 env/
 ENV/
 .env
+cookies.json
 
 # Distribution / packaging
 build/
