@@ -53,9 +53,13 @@ body {
 body.is-loading .site-header__inner {
   border-color: transparent;
   border-bottom: 1px solid rgba(31, 37, 48, 0.18);
-  box-shadow: none;
-  background: transparent;
-  backdrop-filter: none;
+  box-shadow: 0 12px 28px rgba(25, 35, 60, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+body.is-loading .page-shell {
+  opacity: 0.34;
 }
 
 .site-title,
@@ -239,6 +243,7 @@ button {
 .loading-overlay {
   position: fixed;
   inset: 0;
+  z-index: 1000;
   display: grid;
   place-items: center;
   background: rgba(17, 22, 35, 0.58);
@@ -256,6 +261,8 @@ button {
 }
 
 .loading-card {
+  position: relative;
+  z-index: 1001;
   width: min(420px, calc(100vw - 40px));
   padding: 28px;
   border-radius: 24px;
@@ -331,7 +338,14 @@ button {
 }
 
 .result-shell {
-  padding-block: 40px;
+  align-items: start;
+  min-height: calc(100vh - 96px);
+  padding: 112px 24px 20px;
+}
+
+.result-card {
+  width: min(1120px, 100%);
+  padding: 28px 30px;
 }
 
 .result-card h1 {
@@ -342,8 +356,8 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  margin: 22px 0 28px;
-  padding: 12px 18px;
+  margin: 18px 0 22px;
+  padding: 10px 16px;
   border-radius: 999px;
   background: rgba(13, 91, 214, 0.08);
 }
@@ -355,17 +369,37 @@ button {
 
 .score-value {
   font: 700 1.8rem/1 "Trebuchet MS", sans-serif;
-  color: var(--accent-strong);
+}
+
+.numeric-value {
+  font-weight: 700;
+  transition: color 160ms ease;
+}
+
+.numeric-value.is-low {
+  color: #1f8a4c;
+}
+
+.numeric-value.is-medium-low {
+  color: #c99a00;
+}
+
+.numeric-value.is-medium-high {
+  color: #d97a1f;
+}
+
+.numeric-value.is-high {
+  color: #c23a2b;
 }
 
 .result-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 .result-grid article {
-  padding: 20px;
+  padding: 16px 18px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(31, 37, 48, 0.08);
@@ -375,7 +409,7 @@ button {
   margin-bottom: 0;
   font-family: "Trebuchet MS", sans-serif;
   color: var(--muted);
-  line-height: 1.65;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }

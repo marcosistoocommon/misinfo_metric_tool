@@ -33,9 +33,15 @@
         </div>
         {% endif %}
 
+        {% set score_class = 'is-low' if score|float <= 0.25 else 'is-medium-low' if score|float <= 0.5 else 'is-medium-high' if score|float <= 0.7 else 'is-high' %}
+        {% set context_class = 'is-low' if context <= 0.25 else 'is-medium-low' if context <= 0.5 else 'is-medium-high' if context <= 0.7 else 'is-high' %}
+        {% set verification_class = 'is-low' if verification <= 0.25 else 'is-medium-low' if verification <= 0.5 else 'is-medium-high' if verification <= 0.7 else 'is-high' %}
+        {% set patterns_class = 'is-low' if patterns <= 0.25 else 'is-medium-low' if patterns <= 0.5 else 'is-medium-high' if patterns <= 0.7 else 'is-high' %}
+        {% set tone_class = 'is-low' if tone <= 0.25 else 'is-medium-low' if tone <= 0.5 else 'is-medium-high' if tone <= 0.7 else 'is-high' %}
+
         <div class="score-rail">
           <span class="score-label">{{ text.score_label }}</span>
-          <span class="score-value">{{ score }}</span>
+          <span class="score-value numeric-value {{ score_class }}">{{ score }}</span>
         </div>
 
         <div class="result-grid">
@@ -46,10 +52,10 @@
 
           <article>
             <h2>{{ text.inputs_used }}</h2>
-            <p>{{ text.context_line }}: {{ '%.2f'|format(context) }}</p>
-            <p>{{ text.verification_line }}: {{ '%.2f'|format(verification) }}</p>
-            <p>{{ text.patterns_line }}: {{ '%.2f'|format(patterns) }}</p>
-            <p>{{ text.tone_line }}: {{ '%.2f'|format(tone) }}</p>
+            <p>{{ text.context_line }}: <span class="numeric-value {{ context_class }}">{{ '%.2f'|format(context) }}</span></p>
+            <p>{{ text.verification_line }}: <span class="numeric-value {{ verification_class }}">{{ '%.2f'|format(verification) }}</span></p>
+            <p>{{ text.patterns_line }}: <span class="numeric-value {{ patterns_class }}">{{ '%.2f'|format(patterns) }}</span></p>
+            <p>{{ text.tone_line }}: <span class="numeric-value {{ tone_class }}">{{ '%.2f'|format(tone) }}</span></p>
           </article>
         </div>
 

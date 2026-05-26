@@ -1,13 +1,18 @@
+import os
+from pathlib import Path
 from threading import Lock, Thread
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from misinfo_value import analyze_message as calculate_analysis
 from Claims.verification import ClaimeAIError, agent_error, initialize_agent
 
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "dev-prototype-key"
+app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
 
 CLAIMEAI_ERROR = None
 
@@ -34,13 +39,13 @@ TEXT = {
         "option_en": "English",
         "option_es": "Spanish",
         "loading_title": "Running analysis",
-        "loading_subtitle": "The app is extracting claims, verifying them, and scoring the text.",
+        "loading_subtitle": "The app is evaluating the message and computing the score.",
         "result_title": "Assigned value",
         "score_label": "Score",
         "original_message": "Original message",
         "inputs_used": "Component values",
         "context_line": "Context",
-        "verification_line": "Verification",
+        "verification_line": "Fakeness",
         "patterns_line": "Patterns",
         "tone_line": "Tone",
         "another": "Analyze another message",
@@ -49,9 +54,9 @@ TEXT = {
         "numeric_error": "must be a number between 0 and 1.",
         "steps": [
             "Validating inputs",
+            "Analyzing patterns and tone",
             "Extracting claims",
             "Verifying claims",
-            "Analyzing patterns and tone",
             "Computing the final score",
             "Preparing the result page",
         ],
@@ -69,13 +74,13 @@ TEXT = {
         "option_en": "Inglés",
         "option_es": "Español",
         "loading_title": "Ejecutando el análisis",
-        "loading_subtitle": "La aplicación está extrayendo claims, verificándolos y calculando la puntuación.",
+        "loading_subtitle": "La aplicación está evaluando el mensaje y calculando la puntuación.",
         "result_title": "Valor asignado",
         "score_label": "Puntuación",
         "original_message": "Mensaje original",
         "inputs_used": "Valores de los componentes",
         "context_line": "Contexto",
-        "verification_line": "Verificación",
+        "verification_line": "Falsedad",
         "patterns_line": "Patrones",
         "tone_line": "Tono",
         "another": "Analizar otro mensaje",
@@ -84,9 +89,9 @@ TEXT = {
         "numeric_error": "debe ser un número entre 0 y 1.",
         "steps": [
             "Validando los datos",
+            "Analizando patrones y tono",
             "Extrayendo claims",
             "Verificando claims",
-            "Analizando patrones y tono",
             "Calculando la puntuación final",
             "Preparando la página de resultados",
         ],
@@ -98,9 +103,9 @@ JOB_CACHE = {}
 JOB_LOCK = Lock()
 STAGE_INDEX = {
     "normalizing_text": 1,
-    "extracting_claims": 1,
-    "verifying_claims": 2,
-    "analyzing_patterns": 3,
+    "analyzing_patterns": 1,
+    "extracting_claims": 2,
+    "verifying_claims": 3,
     "computing_score": 4,
     "preparing_result": 5,
     "aggregating_verdict": 4,

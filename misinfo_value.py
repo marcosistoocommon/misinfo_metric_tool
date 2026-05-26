@@ -59,11 +59,12 @@ def analyze_message(input_text, context, debug=False, progress_callback=None):
     else:
         patterns_score, tone_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
         details = None
+    text = translate_and_preprocess(input_text)
+    verification_value = false_confidence(text, progress_callback=progress_callback)
 
     if progress_callback:
         progress_callback("computing_score")
 
-    verification_value = false_confidence(input_text, progress_callback=progress_callback)
     context_value = float(context)
     score = (patterns_score * 0.45) + (tone_score * 0.15) + (context_value * 0.1) + (verification_value * 0.3)
 

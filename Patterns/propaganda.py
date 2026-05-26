@@ -1,11 +1,17 @@
+import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
+from dotenv import load_dotenv
 import requests
 
 BASE_URL = "https://apihub.tanbih.org"
 PROPAGANDA_ENDPOINT = "/api/v1/propaganda-text-analysis/en"
 TIMEOUT_SECONDS = 30
-API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYXJjb3MucGVyZXpAYWx1bW5vcy51cG0uZXMiLCJpYXQiOjE3NzUzMDk2MTIsIm5iZiI6MTc3NTMwOTYxMiwianRpIjoiZWUzZjQ1MWEtMDU1YS00ZDA5LTk3YzQtMDgyY2NhMzdlNWI5IiwiZXhwIjoxNzc3OTAxNjEyLCJ0eXBlIjoiYWNjZXNzIiwiZnJlc2giOmZhbHNlLCJyb2xlIjoidXNlciIsIm5hbWUiOiJtYXJjb3MucGVyZXoiLCJ1c2VyX2lkIjozN30.dKOlUyJjECd4_t4NGuG60w71Iw9H0_ILsDg6K2FeaD8"  # Set your API key here if required
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+API_KEY = os.environ["PROPAGANDA_API_KEY"]
 
 
 def post_json(endpoint: str, payload: Dict[str, str], token: Optional[str]) -> Dict[str, Any]:

@@ -1,17 +1,13 @@
 """Repo-local ClaimeAI adapter.
 
 This module treats the cloned `ClaimeAI/` folder as an internal microservice
-boundary without needing Docker or a separate process. The app can import this
-module directly, and if the ClaimeAI agent packages are available, it will use
-them; otherwise it falls back to a neutral heuristic.
+boundary without needing Docker or a separate process.
 """
 
 from __future__ import annotations
 
 import asyncio
 import importlib
-import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,12 +31,7 @@ def claimeai_available() -> bool:
 
 
 def initialize_agent(force: bool = False) -> bool:
-	"""Eagerly import and validate the ClaimeAI graphs.
-
-	This is safe to call from `app.py` at startup. It returns True when the
-	agent can be used and raises `ClaimeAIError` with a human-readable message
-	when initialization fails.
-	"""
+	"""Eagerly import and validate the ClaimeAI graphs."""
 	global _AGENT_READY, _AGENT_ERROR
 
 	if _AGENT_READY and not force:
@@ -56,9 +47,9 @@ def initialize_agent(force: bool = False) -> bool:
 		if getattr(claim_extractor_module, "graph", None) is None:
 			raise ClaimeAIError("ClaimeAI claim extractor graph is not available.")
 
-		fact_checker_module = importlib.import_module("fact_checker")
-		if getattr(fact_checker_module, "graph", None) is None:
-			raise ClaimeAIError("ClaimeAI fact checker graph is not available.")
+		claim_verifier_module = importlib.import_module("claim_verifier")
+		if getattr(claim_verifier_module, "graph", None) is None:
+			raise ClaimeAIError("ClaimeAI claim verifier graph is not available.")
 
 		_AGENT_READY = True
 		_AGENT_ERROR = None
@@ -79,32 +70,44 @@ def agent_error() -> str | None:
 
 
 def extract_claims(text: str) -> list[str]:
-	"""Extract claims from text using ClaimeAI when available."""
-	if claimeai_available():
-		try:
-			if not _AGENT_READY:
-				initialize_agent()
-			_notify = None
-			claim_extractor_module = importlib.import_module("claim_extractor")
-			claim_extractor_graph = getattr(claim_extractor_module, "graph", None)
-			if claim_extractor_graph is None:
-				raise ClaimeAIError("ClaimeAI claim extractor graph is not available.")
-			result = _run_async(claim_extractor_graph.ainvoke({"answer_text": text}))
-			validated_claims = result.get("validated_claims") if isinstance(result, dict) else None
-			if validated_claims:
-				claims: list[str] = []
-				for claim in validated_claims:
-					claim_text = getattr(claim, "claim_text", None) or getattr(claim, "text", None)
-					if claim_text:
-						claims.append(str(claim_text))
-				if claims:
-					return claims
-		except Exception:
-			if isinstance(sys.exc_info()[1], ClaimeAIError):
-				raise
-			raise ClaimeAIError("Error invoking ClaimeAI claim extractor.") from sys.exc_info()[1]
+	"""Extract claims from text using ClaimeAI claim extractor."""
+	if not claimeai_available():
+		raise ClaimeAIError("ClaimeAI backend folder was not found.")
 
-	return _sentence_split(text)
+	try:
+		if not _AGENT_READY:
+			initialize_agent()
+		claim_extractor_module = importlib.import_module("claim_extractor")
+		claim_extractor_graph = getattr(claim_extractor_module, "graph", None)
+		if claim_extractor_graph is None:
+			raise ClaimeAIError("ClaimeAI claim extractor graph is not available.")
+
+		result = _run_async(claim_extractor_graph.ainvoke({"answer_text": text}))
+		if not isinstance(result, dict):
+			raise ClaimeAIError("ClaimeAI claim extractor returned an invalid payload.")
+
+		validated_claims = result.get("validated_claims")
+		if not validated_claims:
+			# No validated claims were found; return empty list so caller can decide behavior
+			return []
+
+		claims: list[str] = []
+		for claim in validated_claims:
+			claim_text = getattr(claim, "claim_text", None) or getattr(claim, "text", None)
+			if claim_text:
+				claims.append(str(claim_text))
+
+		if not claims:
+			# No claim text present after validation
+			return []
+
+		return claims
+	except Exception as exc:
+		global _AGENT_ERROR
+		_AGENT_ERROR = str(exc)
+		if isinstance(exc, ClaimeAIError):
+			raise
+		raise ClaimeAIError(f"Error invoking ClaimeAI claim extractor: {exc}") from exc
 
 
 def false_confidence(text: str, progress_callback=None) -> float:
@@ -113,63 +116,64 @@ def false_confidence(text: str, progress_callback=None) -> float:
 		progress_callback("extracting_claims")
 
 	claims = extract_claims(text)
+	# If extractor found no verifiable claims, score should be 0
+	if not claims:
+		if progress_callback:
+			progress_callback("aggregating_verdict")
+		return 0.0
 
 	if progress_callback:
 		progress_callback("verifying_claims")
 
-	if claimeai_available():
-		try:
-			if not _AGENT_READY:
-				initialize_agent()
-			fact_checker_module = importlib.import_module("fact_checker")
-			fact_checker_graph = getattr(fact_checker_module, "graph", None)
-			if fact_checker_graph is None:
-				raise ClaimeAIError("ClaimeAI fact checker graph is not available.")
-			result = _run_async(
-				fact_checker_graph.ainvoke(
-					{
-						"question": "Verify the factual accuracy of the following text.",
-						"answer": text,
-					}
-				)
-			)
-			final_report = None
-			if isinstance(result, dict):
-				final_report = result.get("final_report")
-			else:
-				final_report = getattr(result, "final_report", None)
-			if final_report is not None:
-				if progress_callback:
-					progress_callback("aggregating_verdict")
-				return _score_from_report(final_report)
-		except Exception:
-			if isinstance(sys.exc_info()[1], ClaimeAIError):
-				raise
-			raise ClaimeAIError("Error invoking ClaimeAI fact checker.") from sys.exc_info()[1]
+	try:
+		if not _AGENT_READY:
+			initialize_agent()
+		verdicts = _verify_claims_directly(claims)
+		if not verdicts:
+			raise ClaimeAIError("ClaimeAI claim verifier returned no verdicts.")
 
-	if progress_callback:
-		progress_callback("aggregating_verdict")
-	return _offline_false_confidence(text, claims)
+		if progress_callback:
+			progress_callback("aggregating_verdict")
+		return _score_from_verdicts(verdicts)
+	except Exception as exc:
+		global _AGENT_ERROR
+		_AGENT_ERROR = str(exc)
+		if isinstance(exc, ClaimeAIError):
+			raise
+		raise ClaimeAIError(f"Error invoking ClaimeAI fact checker: {exc}") from exc
 
 
-def _offline_false_confidence(text: str, claims: list[str] | None = None) -> float:
-	claims = claims if claims is not None else extract_claims(text)
-	if not claims:
-		return 0.5
+def _verify_claims_directly(claims: list[str]) -> list[Any]:
+	"""Verify extracted claims directly with the claim verifier graph."""
+	claim_verifier_module = importlib.import_module("claim_verifier")
+	claim_verifier_graph = getattr(claim_verifier_module, "graph", None)
+	if claim_verifier_graph is None:
+		raise ClaimeAIError("ClaimeAI claim verifier graph is not available.")
 
-	# Neutral offline fallback: more extracted claims means more surface area to
-	# check, but we keep this conservative.
-	return max(0.0, min(1.0, 0.35 + min(len(claims) * 0.1, 0.3)))
+	verdicts: list[Any] = []
+	for index, claim_text in enumerate(claims):
+		claim_payload = {
+			"claim_text": claim_text,
+			"is_complete_declarative": True,
+			"disambiguated_sentence": claim_text,
+			"original_sentence": claim_text,
+			"original_index": index,
+		}
+		result = _run_async(claim_verifier_graph.ainvoke({"claim": claim_payload}))
+		if not isinstance(result, dict):
+			raise ClaimeAIError("ClaimeAI claim verifier returned an invalid payload.")
+		verdict = result.get("verdict")
+		if verdict is None:
+			raise ClaimeAIError(f"No verdict returned for claim: {claim_text}")
+		verdicts.append(verdict)
+
+	return verdicts
 
 
-def _score_from_report(final_report: Any) -> float:
-	verified_claims = getattr(final_report, "verified_claims", None) or []
-	if not verified_claims:
-		return 0.5
-
-	scores = [_map_verdict_to_false_confidence(verdict) for verdict in verified_claims]
+def _score_from_verdicts(verdicts: list[Any]) -> float:
+	scores = [_map_verdict_to_false_confidence(verdict) for verdict in verdicts]
 	if not scores:
-		return 0.5
+		raise ClaimeAIError("ClaimeAI verifier did not return valid verdicts.")
 	return max(0.0, min(1.0, sum(scores) / len(scores)))
 
 
@@ -182,16 +186,7 @@ def _map_verdict_to_false_confidence(verdict: Any) -> float:
 		return 1.0
 	if normalized in {"supported", "true"}:
 		return 0.0
-	if normalized in {"conflicting", "conflicting_evidence", "mixed"}:
-		return 0.65
-	if normalized in {"insufficient_information", "unknown", "unverifiable"}:
-		return 0.5
-	return 0.5
-
-
-def _sentence_split(text: str) -> list[str]:
-	sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
-	return sentences or ([text.strip()] if text.strip() else [])
+	return 0.4  # Uncertain or unknown verdicts get a moderate false confidence
 
 
 def _run_async(coro: Any) -> Any:
@@ -207,5 +202,4 @@ def _run_async(coro: Any) -> Any:
 		loop.close()
 
 
-__all__ = ["claimeai_available", "extract_claims", "false_confidence"]
-
+__all__ = ["claimeai_available", "extract_claims", "false_confidence", "initialize_agent", "agent_error", "ClaimeAIError"]
