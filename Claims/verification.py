@@ -217,7 +217,7 @@ def _score_from_verdicts(verdicts: list[Any]) -> float:
 
 
 def _map_verdict_to_false_confidence(verdict: Any) -> float:
-	result = getattr(verdict, "result", None)
+	result = getattr(verdict, "result")
 	result_value = getattr(result, "value", result)
 	normalized = str(result_value).strip().lower()
 
@@ -226,4 +226,3 @@ def _map_verdict_to_false_confidence(verdict: Any) -> float:
 	if normalized in {"supported", "true"}:
 		return 0.0
 	return 0.4  # Uncertain or unknown verdicts get a moderate false confidence
-__all__ = ["claimeai_available", "extract_claims", "false_confidence", "initialize_agent", "agent_error", "ClaimeAIError"]

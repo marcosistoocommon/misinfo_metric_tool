@@ -27,18 +27,35 @@ weights = [0.25, 0.1, 0.3, 0.15, 0.2]
 bias_weight, violence_weight, propaganda_weight, emotion_weight, fallacy_weight = weights
 
 def patterns_and_tone_score(input_text, debug=False, progress_callback=None):
+    """Compute combined pattern and tone scores for `input_text`.
+
+    This runs the translation/preprocessing pipeline and all pattern
+    detectors (bias, violence, propaganda, emotion, fallacies) and returns
+    an aggregated pattern score together with the tone value.
+
+    Args:
+        input_text: Raw input text.
+        debug: When True, also return a `details` dict with individual
+            component scores.
+        progress_callback: Optional callable to report progress stages.
+
+    Returns:
+        Tuple `(patterns_score, tone)` or `(patterns_score, tone, details)` when
+        `debug=True`.
+    """
+
     if progress_callback:
         progress_callback("normalizing_text")
     text = translate_and_preprocess(input_text)
     if progress_callback:
         progress_callback("analyzing_patterns")
-    bias = bias_value(text) or 0.0
-    violence = violence_value(text) or 0.0
-    propaganda = propaganda_score(text) or 0.0
-    tone = tone_value(text) or 0.0
-    emotion = emotion_score(text) or 0.0
-    hate_speech = hate_speech_value(text) or 0.0
-    fallacy = fallacy_score(text) or 0.0
+    bias = bias_value(text) 
+    violence = violence_value(text) 
+    propaganda = propaganda_score(text) 
+    tone = tone_value(text)
+    emotion = emotion_score(text) 
+    hate_speech = hate_speech_value(text) 
+    fallacy = fallacy_score(text) 
     patterns_score = bias * bias_weight + (violence + hate_speech) / 2 * violence_weight + propaganda * propaganda_weight + emotion * emotion_weight + fallacy * fallacy_weight
     if debug:
         details = {
@@ -54,6 +71,13 @@ def patterns_and_tone_score(input_text, debug=False, progress_callback=None):
     return patterns_score, tone
 
 def analyze_message(input_text, context, debug=False, progress_callback=None):
+    """Analyze a message and compute the overall misinformation payload.
+
+    Runs pattern/tone analysis, translation, and content verification to
+    produce a single `payload` dictionary containing the overall score
+    and component values. When `debug=True` the `details` dict is included.
+    """
+
     if debug:
         patterns_score, tone_score, details = patterns_and_tone_score(input_text, debug=True, progress_callback=progress_callback)
     else:
@@ -85,6 +109,13 @@ def analyze_message(input_text, context, debug=False, progress_callback=None):
 
 
 def calculate_misinformation_score(input_text, context, veracity=None, debug=False, progress_callback=None):
+    """Convenience wrapper returning only the score (or score+details).
+
+    When called programmatically with `veracity` provided the function
+    returns immediately, otherwise it acts as the library entrypoint used
+    by the CLI below.
+    """
+
     result = analyze_message(input_text, context, debug=debug, progress_callback=progress_callback)
     if debug:
         return result["score"], {**(result.get("details") or {}), "context": result["context"], "verification": result["verification"], "patterns": result["patterns"], "tone": result["tone"]}
@@ -92,6 +123,14 @@ def calculate_misinformation_score(input_text, context, veracity=None, debug=Fal
 
 
 def main(input_text=None, context=None, veracity=None, debug=False, progress_callback=None):
+    """CLI entrypoint for computing misinformation scores.
+
+    When invoked without CLI args the function prompts the user for input.
+    When called programmatically with `input_text`, `context` and `veracity`
+    provided it returns the computed score or (score, details) when
+    `debug=True`.
+    """
+
     if input_text is not None and context is not None and veracity is not None:
         return calculate_misinformation_score(
             input_text,

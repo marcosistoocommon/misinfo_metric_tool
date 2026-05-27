@@ -4,12 +4,25 @@ import torch
 from transformers import AutoTokenizer
 from transformers import AutoModelForSequenceClassification
 
-def fallacy_score(text):
+def fallacy_score(text) -> float:
+    """Estimate a fallacy score for `text` using a pretrained classifier.
+
+    The function loads a DistilBERT fallacy classifier, computes softmax
+    over labels and returns a single positive score representing the
+    prominence of the top non-`miscellaneous` label.
+
+    Args:
+        text: Input text to evaluate.
+
+    Returns:
+        Float >= 0 indicating estimated fallaciousness (higher => more fallacious).
+    """
+
     os.environ["DISABLE_SAFETENSORS_CONVERSION"] = "1"
 
     model = AutoModelForSequenceClassification.from_pretrained(
-    "q3fer/distilbert-base-fallacy-classification",
-    use_safetensors=False,
+        "q3fer/distilbert-base-fallacy-classification",
+        use_safetensors=False,
     )
     tokenizer = AutoTokenizer.from_pretrained("q3fer/distilbert-base-fallacy-classification")
 
@@ -23,12 +36,17 @@ def fallacy_score(text):
     _, ranking = torch.topk(scores, k=scores.shape[0])
     ranking = ranking.tolist()
     miscpos = model.config.label2id["miscellaneous"]
-    score = scores[ranking[0]].item()-scores[miscpos].item()
+    score = scores[ranking[0]].item() - scores[miscpos].item()
     if score < 0:
         score = 0
     return score
 
 def main():
+    """Simple CLI entrypoint for interactive testing of `fallacy_score`.
+
+    Prompts the user for text and prints the computed fallacy score.
+    """
+
     input_text = input("Enter the text to analyze for fallacies: ")
     score = fallacy_score(input_text)
     print(f"Fallacy score: {score:.4f}")

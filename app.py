@@ -8,7 +8,7 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from misinfo_value import analyze_message as calculate_analysis
 from Context.context import analyze_x_url
-from Claims.verification import ClaimeAIError, agent_error, initialize_agent
+from Claims.verification import ClaimeAIError, initialize_agent
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 

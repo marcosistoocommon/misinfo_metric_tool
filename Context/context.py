@@ -25,6 +25,19 @@ weights = [0.05, 0.05, 0.2, 0.3, 0.3, 0.1]
 
 
 def _score_context_data(context):
+    """Compute an aggregated context score from extracted X status context.
+
+    The function evaluates profile picture politicalness, username and
+    description politicalness, mutual follower signals, recent posts, and
+    recency signals and combines them using fixed `weights`.
+
+    Args:
+        context: The dictionary returned by `extract_x_status_context`.
+
+    Returns:
+        A float in the 0..1 range representing the aggregated context score.
+    """
+
     pfp_score = 0.0
     name_score = 0.0
     description_score = 0.0
@@ -85,6 +98,17 @@ def _score_context_data(context):
 
 
 def analyze_x_url(url, progress_callback=None):
+    """Extract and score an X status URL.
+
+    Args:
+        url: The X status URL to analyze.
+        progress_callback: Optional callback receiving progress stage names.
+
+    Returns:
+        A dict with keys: `message`, `context`, `tweet`, `profile`, `raw_context`.
+        Raises on extraction errors.
+    """
+
     if "twitter.com" in url or "x.com" in url:
         try:
             if progress_callback:
@@ -111,6 +135,12 @@ def analyze_x_url(url, progress_callback=None):
 
 
 def calculate_context_value(url, progress_callback=None):
+    """Helper that returns only the numeric context value for a URL.
+
+    This wraps `analyze_x_url` and returns the `context` float when
+    available, or the raw result (error token) otherwise.
+    """
+
     result = analyze_x_url(url, progress_callback=progress_callback)
     if isinstance(result, dict):
         return result["context"]
