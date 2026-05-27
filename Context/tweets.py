@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -9,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 
+from twscrape import API, AccountsPool
 from Scweet import Scweet
 
 
@@ -20,11 +22,12 @@ STATUS_URL_PATTERN = re.compile(
 DEFAULT_TIMELINE_LIMIT = 50
 DEFAULT_SOCIAL_LIMIT = 5
 DEFAULT_LAST_POSTS = 3
+TWSCRAPE_DB_PATH = Path(__file__).resolve().parents[1] / "accounts.db"
 
 
 
 
-def _load_auth_candidates() -> tuple[list[dict[str, str | None]], Path]:
+def _load_auth_candidates() -> tuple[list[dict[str, Any]], Path]:
     cookies_path = Path(__file__).resolve().parent / "cookies.json"
 
     try:
@@ -42,22 +45,35 @@ def _load_auth_candidates() -> tuple[list[dict[str, str | None]], Path]:
     else:
         raise ValueError("cookies.json must be a JSON object or an array of account objects")
 
-    candidates: list[dict[str, str | None]] = []
+    candidates: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
         if not isinstance(record, dict):
             continue
         cookies = record.get("cookies")
         token = record.get("auth_token")
+        cookie_values: dict[str, str] = {}
+        if isinstance(cookies, dict):
+            cookie_values = {
+                str(key): str(value).strip()
+                for key, value in cookies.items()
+                if isinstance(value, str) and value.strip()
+            }
+
+        if not token and cookie_values.get("auth_token"):
+            token = cookie_values["auth_token"]
         if not token and isinstance(cookies, dict):
             token = cookies.get("auth_token")
         if not isinstance(token, str) or not token.strip():
             continue
+
+        cookie_values.setdefault("auth_token", token.strip())
 
         proxy = record.get("proxy")
         username = record.get("username")
         candidates.append(
             {
                 "auth_token": token.strip(),
+                "cookies": cookie_values,
                 "proxy": proxy.strip() if isinstance(proxy, str) and proxy.strip() else None,
                 "username": username.strip() if isinstance(username, str) and username.strip() else f"account_{index}",
             }
@@ -72,10 +88,74 @@ def _load_auth_candidates() -> tuple[list[dict[str, str | None]], Path]:
     return candidates, cookies_path
 
 
-def _extract_with_client(
+async def _build_twscrape_api(candidates: list[dict[str, Any]]) -> API:
+    pool = AccountsPool(db_file=str(TWSCRAPE_DB_PATH), raise_when_no_account=True)
+    failures: list[str] = []
+
+    for index, candidate in enumerate(candidates, start=1):
+        account_name = candidate.get("username") or f"account_{index}"
+        cookies = candidate.get("cookies")
+        if not isinstance(cookies, dict) or not cookies:
+            cookies = {"auth_token": str(candidate["auth_token"]).strip()}
+
+        try:
+            await pool.add_account(
+                username=account_name,
+                password="_",
+                email="_",
+                email_password="_",
+                proxy=candidate.get("proxy"),
+                cookies=json.dumps({"cookies": cookies}, ensure_ascii=False),
+            )
+            await pool.set_active(account_name, True)
+        except Exception as exc:
+            failures.append(f"[{index}/{len(candidates)}] {account_name}: {exc}")
+
+    if failures:
+        raise RuntimeError("Failed to prepare twscrape accounts: " + " | ".join(failures))
+
+    return API(pool=pool, raise_when_no_account=True)
+
+
+async def _fetch_original_tweet(tweet_id: str, username: str, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    api = await _build_twscrape_api(candidates)
+
+    tweet = await api.tweet_details(int(tweet_id))
+    if tweet is None:
+        raise LookupError(f"Could not retrieve tweet_id={tweet_id} with twscrape")
+
+    tweet_data = tweet.dict() if hasattr(tweet, "dict") else dict(tweet)
+    author = tweet_data.get("user") if isinstance(tweet_data.get("user"), dict) else {}
+    author_username = str(author.get("username") or "").strip().lower()
+    if author_username and author_username != username.strip().lower():
+        raise ValueError(
+            f"tweet_id={tweet_id} belongs to @{author_username}, not @{username}"
+        )
+
+    media = tweet_data.get("media") if isinstance(tweet_data.get("media"), dict) else {}
+    image_links = [
+        str(photo.get("url") or "").strip()
+        for photo in media.get("photos", [])
+        if isinstance(photo, dict) and str(photo.get("url") or "").strip()
+    ]
+
+    created_at = tweet_data.get("date")
+    created_at_value = created_at.isoformat() if hasattr(created_at, "isoformat") else None
+
+    return {
+        "text": str(tweet_data.get("rawContent") or tweet_data.get("text") or "").strip(),
+        "image_links": image_links,
+        "tweet_id": str(tweet_data.get("id_str") or tweet_data.get("id") or tweet_id),
+        "url": tweet_data.get("url"),
+        "created_at": created_at_value,
+        "username": author.get("username"),
+        "name": author.get("displayname"),
+    }
+
+
+def _extract_scweet_context(
     client: Scweet,
     username: str,
-    tweet_id: str,
     *,
     timeline_limit: int,
     social_limit: int,
@@ -83,20 +163,6 @@ def _extract_with_client(
 ) -> dict[str, Any]:
     profile_info = _pick_first(client.get_user_info([username]))
     timeline = client.get_profile_tweets([username], limit=timeline_limit)
-
-    matched_tweet = next(
-        (
-            item
-            for item in timeline
-            if isinstance(item, dict)
-            and str(item.get("tweet_id") or "") == tweet_id
-        ),
-        None,
-    )
-    if matched_tweet is None:
-        raise LookupError(
-            f"Could not find tweet_id={tweet_id} in the collected timeline for @{username}"
-        )
 
     followers = client.get_followers([username], limit=social_limit)
     following = client.get_following([username], limit=social_limit)
@@ -112,7 +178,6 @@ def _extract_with_client(
     ][:last_posts_count]
 
     return {
-        "tweet": _compact_tweet_item(matched_tweet),
         "profile": {
             "username": profile_info.get("username") or username,
             "description": profile_info.get("description"),
@@ -184,8 +249,8 @@ def _compact_tweet_item(item: dict[str, Any]) -> dict[str, Any]:
     user = item.get("user") if isinstance(item.get("user"), dict) else {}
     media = item.get("media") if isinstance(item.get("media"), dict) else {}
     return {
-        "text": item.get("text"),
-        "image_links": list(media.get("image_links") or []),
+        "text": item.get("text") or item.get("rawContent"),
+        "image_links": list(media.get("image_links") or media.get("photos") or []),
     }
 
 
@@ -196,11 +261,13 @@ def extract_x_status_context(
     social_limit: int = DEFAULT_SOCIAL_LIMIT,
     last_posts_count: int = DEFAULT_LAST_POSTS,
 ) -> dict[str, Any]:
-    """Extract author and tweet context from an X status URL using Scweet."""
+    """Extract author and tweet context from an X status URL using twscrape and Scweet."""
 
     username, tweet_id = _extract_status_parts(status_url)
     candidates, cookies_path = _load_auth_candidates()
     errors: list[str] = []
+
+    tweet = asyncio.run(_fetch_original_tweet(tweet_id, username, candidates))
 
     for index, candidate in enumerate(candidates, start=1):
         client_kwargs: dict[str, Any] = {"auth_token": candidate["auth_token"]}
@@ -209,14 +276,17 @@ def extract_x_status_context(
 
         try:
             client = Scweet(**client_kwargs)
-            return _extract_with_client(
+            scweet_context = _extract_scweet_context(
                 client,
                 username,
-                tweet_id,
                 timeline_limit=timeline_limit,
                 social_limit=social_limit,
                 last_posts_count=last_posts_count,
             )
+            return {
+                "tweet": tweet,
+                **scweet_context,
+            }
         except Exception as exc:
             account_label = candidate.get("username") or f"account_{index}"
             errors.append(f"[{index}/{len(candidates)}] {account_label}: {exc}")

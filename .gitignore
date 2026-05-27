@@ -10,7 +10,7 @@ env/
 ENV/
 .env
 cookies.json
-
+*.db
 # Distribution / packaging
 build/
 dist/
