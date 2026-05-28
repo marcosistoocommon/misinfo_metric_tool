@@ -21,7 +21,7 @@ STATUS_URL_PATTERN = re.compile(
 )
 DEFAULT_TIMELINE_LIMIT = 50
 DEFAULT_SOCIAL_LIMIT = 5
-DEFAULT_LAST_POSTS = 3
+DEFAULT_LAST_POSTS = 5
 TWSCRAPE_DB_PATH = Path(__file__).resolve().parents[1] / "accounts.db"
 
 

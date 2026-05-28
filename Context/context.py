@@ -58,7 +58,7 @@ def _score_context_data(context):
     if username:
         name_score = handle_politicalness(username)
     if description:
-        description_score = handle_politicalness(description)
+        description_score = handle_politicalness(description) * 0.5 + patterns_and_tone_score(description)[0] * 0.25 + patterns_and_tone_score(description)[1] * 0.25
 
     for follower in context["mutual_followers"]:
         follower_profile_pic = follower.get("profile_pic")
@@ -70,7 +70,7 @@ def _score_context_data(context):
         if follower_username:
             mutual_followers_score += handle_politicalness(follower_username) * 0.25
         if follower_description:
-            mutual_followers_score += patterns_and_tone_score(follower_description)[0] * 0.5
+            mutual_followers_score += patterns_and_tone_score(follower_description)[0] * 0.125 + patterns_and_tone_score(follower_description)[1] * 0.125 + handle_politicalness(follower_description) * 0.25
 
     if context["mutual_followers"]:
         mutual_followers_score /= (len(context["mutual_followers"]) * 3)
