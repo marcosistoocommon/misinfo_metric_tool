@@ -54,10 +54,48 @@
           <article>
             <h2>{{ text.inputs_used }}</h2>
             <p>{{ text.url_line }}: <a href="{{ x_url }}" target="_blank" rel="noreferrer">{{ x_url }}</a></p>
-            <p>{{ text.context_line }}: <span class="numeric-value {{ context_class }}">{{ '%.2f'|format(context) }}</span></p>
-            <p>{{ text.verification_line }}: <span class="numeric-value {{ verification_class }}">{{ '%.2f'|format(verification) }}</span></p>
-            <p>{{ text.patterns_line }}: <span class="numeric-value {{ patterns_class }}">{{ '%.2f'|format(patterns) }}</span></p>
-            <p>{{ text.tone_line }}: <span class="numeric-value {{ tone_class }}">{{ '%.2f'|format(tone) }}</span></p>
+            <div class="metric-expander">
+              <button type="button" class="metric-toggle extra-data" data-metric-toggle="patterns" aria-expanded="false" aria-controls="patterns-details">
+                <span class="metric-toggle__label">{{ text.patterns_line }}</span>
+                <span class="metric-toggle__value numeric-value {{ patterns_class }}">{{ '%.2f'|format(patterns) }}</span>
+              </button>
+              <div class="metric-panel" id="patterns-details" data-metric-panel="patterns" hidden>
+                {% for item in pattern_detail_items %}
+                {% set item_class = 'is-low' if item.value <= 0.25 else 'is-medium-low' if item.value <= 0.5 else 'is-medium-high' if item.value <= 0.7 else 'is-high' %}
+                <div class="metric-panel__row">
+                  <span>{{ item.label }}</span>
+                  <span class="numeric-value {{ item_class }}">{{ '%.2f'|format(item.value) }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>            
+            <div class="metric-expander">
+              <button type="button" class="metric-toggle metric-toggle--static" data-metric-toggle="verification">
+                <span class="metric-toggle__label">{{ text.verification_line }}</span>
+                <span class="metric-toggle__value numeric-value {{ verification_class }}">{{ '%.2f'|format(verification) }}</span>
+              </button>
+            </div>
+            <div class="metric-expander">
+              <button type="button" class="metric-toggle metric-toggle--static" data-metric-toggle="tone">
+                <span class="metric-toggle__label">{{ text.tone_line }}</span>
+                <span class="metric-toggle__value numeric-value {{ tone_class }}">{{ '%.2f'|format(tone) }}</span>
+              </button>
+            </div>
+            <div class="metric-expander">
+              <button type="button" class="metric-toggle extra-data" data-metric-toggle="context" aria-expanded="false" aria-controls="context-details">
+                <span class="metric-toggle__label">{{ text.context_line }}</span>
+                <span class="metric-toggle__value numeric-value {{ context_class }}">{{ '%.2f'|format(context) }}</span>
+              </button>
+              <div class="metric-panel" id="context-details" data-metric-panel="context" hidden>
+                {% for item in context_detail_items %}
+                {% set item_class = 'is-low' if item.value <= 0.25 else 'is-medium-low' if item.value <= 0.5 else 'is-medium-high' if item.value <= 0.7 else 'is-high' %}
+                <div class="metric-panel__row">
+                  <span>{{ item.label }}</span>
+                  <span class="numeric-value {{ item_class }}">{{ '%.2f'|format(item.value) }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
           </article>
         </div>
 
@@ -67,11 +105,27 @@
 
     <script>
       const languageSelect = document.getElementById('language');
+      const metricButtons = Array.from(document.querySelectorAll('[data-metric-toggle]'));
 
       languageSelect.addEventListener('change', () => {
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('lang', languageSelect.value);
         window.location.href = currentUrl.toString();
+      });
+
+      metricButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const metricName = button.dataset.metricToggle;
+          const panel = document.querySelector(`[data-metric-panel="${metricName}"]`);
+
+          if (!panel) {
+            return;
+          }
+
+          const isOpen = !panel.hidden;
+          panel.hidden = isOpen;
+          button.setAttribute('aria-expanded', String(!isOpen));
+        });
       });
     </script>
   </body>

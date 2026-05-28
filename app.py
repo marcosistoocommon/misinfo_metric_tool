@@ -40,6 +40,14 @@ TEXT = {
         "option_es": "Spanish",
         "loading_title": "Running analysis",
         "loading_subtitle": "The app is extracting the post text, evaluating the context, and computing the score.",
+        "loading_segments": [
+            ["Resolving the post URL", "Fetching the tweet text", "Loading the author profile", "Collecting recent activity"],
+            ["Normalizing the text", "Running pattern detectors"],
+            ["Extracting claims", "Grouping related claims"],
+            ["Checking evidence", "Comparing verifier results"],
+            ["Combining the final signals", "Calculating the score"],
+            ["Preparing the result page"],
+        ],
         "result_title": "Assigned value",
         "score_label": "Score",
         "original_message": "Extracted message",
@@ -49,6 +57,22 @@ TEXT = {
         "verification_line": "Fakeness",
         "patterns_line": "Patterns",
         "tone_line": "Tone",
+        "context_detail_labels": {
+            "profile_pic": "Profile picture",
+            "name": "Name",
+            "description": "Description",
+            "friends": "Friends",
+            "last_posts": "Last five posts",
+            "recent": "Recent",
+        },
+        "pattern_detail_labels": {
+            "bias": "Bias",
+            "propaganda": "Propaganda",
+            "fallacy": "Fallacy",
+            "hate_speech": "Hate speech",
+            "violence": "Violence",
+            "emotion": "Negative emotions",
+        },
         "another": "Analyze another X post",
         "required_url": "X URL is required.",
         "url_error": "Please enter a valid X status URL.",
@@ -76,6 +100,14 @@ TEXT = {
         "option_es": "Español",
         "loading_title": "Ejecutando el análisis",
         "loading_subtitle": "La aplicación está extrayendo el texto del post, evaluando el contexto y calculando la puntuación.",
+        "loading_segments": [
+            ["Resolviendo la URL del post", "Obteniendo el texto del tuit", "Cargando el perfil del autor", "Recopilando actividad reciente"],
+            ["Normalizando el texto", "Ejecutando detectores de patrones"],
+            ["Extrayendo claims", "Agrupando claims relacionados"],
+            ["Comprobando evidencias", "Comparando resultados del verificador"],
+            ["Combinando las señales finales", "Calculando la puntuación"],
+            ["Preparando la página de resultados"],
+        ],
         "result_title": "Valor asignado",
         "score_label": "Puntuación",
         "original_message": "Mensaje extraído",
@@ -85,6 +117,22 @@ TEXT = {
         "verification_line": "Falsedad",
         "patterns_line": "Patrones",
         "tone_line": "Tono",
+        "context_detail_labels": {
+            "profile_pic": "Foto de perfil",
+            "name": "Nombre",
+            "description": "Descripción",
+            "friends": "Amigos",
+            "last_posts": "Últimos cinco posts",
+            "recent": "Reciente",
+        },
+        "pattern_detail_labels": {
+            "bias": "Sesgo",
+            "propaganda": "Propaganda",
+            "fallacy": "Falacia",
+            "hate_speech": "Discurso de odio",
+            "violence": "Violencia",
+            "emotion": "Emociones negativas",
+        },
         "another": "Analizar otro post de X",
         "required_url": "La URL de X es obligatoria.",
         "url_error": "Introduce una URL de X válida.",
@@ -135,8 +183,11 @@ def run_analysis_job(token, x_url, lang, redirect_url):
         result = calculate_analysis(
             input_text=message,
             context=context_value,
+            debug=True,
             progress_callback=progress_callback,
         )
+        pattern_details = result.get("details") or {}
+        context_details = analysis.get("context_details") or {}
 
         payload = {
             "x_url": x_url,
@@ -145,6 +196,8 @@ def run_analysis_job(token, x_url, lang, redirect_url):
             "verification": result["verification"],
             "patterns": result["patterns"],
             "tone": result["tone"],
+            "context_details": context_details,
+            "patterns_details": pattern_details,
             "score": f"{result['score']:.4f}",
             "lang": lang,
         }
@@ -171,6 +224,31 @@ def get_lang(value=None):
 
 def ui(lang):
     return TEXT[get_lang(lang)]
+
+
+def build_metric_items(text, context_details, pattern_details):
+    context_labels = text["context_detail_labels"]
+    pattern_labels = text["pattern_detail_labels"]
+
+    context_items = [
+        {"label": context_labels["profile_pic"], "value": context_details.get("profile_pic", 0.0)},
+        {"label": context_labels["name"], "value": context_details.get("name", 0.0)},
+        {"label": context_labels["description"], "value": context_details.get("description", 0.0)},
+        {"label": context_labels["friends"], "value": context_details.get("friends", 0.0)},
+        {"label": context_labels["last_posts"], "value": context_details.get("last_posts", 0.0)},
+        {"label": context_labels["recent"], "value": context_details.get("recent", 0.0)},
+    ]
+
+    pattern_items = [
+        {"label": pattern_labels["bias"], "value": pattern_details.get("bias", 0.0)},
+        {"label": pattern_labels["propaganda"], "value": pattern_details.get("propaganda", 0.0)},
+        {"label": pattern_labels["fallacy"], "value": pattern_details.get("fallacy", 0.0)},
+        {"label": pattern_labels["hate_speech"], "value": pattern_details.get("hate_speech", 0.0)},
+        {"label": pattern_labels["violence"], "value": pattern_details.get("violence", 0.0)},
+        {"label": pattern_labels["emotion"], "value": pattern_details.get("emotion", 0.0)},
+    ]
+
+    return context_items, pattern_items
 
 
 def parse_bounded_float(raw_value, field_name, lang):
@@ -232,7 +310,9 @@ def analyze():
             if not isinstance(analysis, dict):
                 raise RuntimeError(str(analysis))
 
-            result = calculate_analysis(input_text=analysis["message"], context=analysis["context"])
+            result = calculate_analysis(input_text=analysis["message"], context=analysis["context"], debug=True)
+            pattern_details = result.get("details") or {}
+            context_details = analysis.get("context_details") or {}
 
             token = uuid4().hex
             RESULT_CACHE[token] = {
@@ -242,6 +322,8 @@ def analyze():
                 "verification": result["verification"],
                 "patterns": result["patterns"],
                 "tone": result["tone"],
+                "context_details": context_details,
+                "patterns_details": pattern_details,
                 "score": f"{result['score']:.4f}",
                 "lang": lang,
             }
@@ -319,6 +401,11 @@ def result(token):
         lang = "en"
 
     text = ui(lang)
+    context_detail_items, pattern_detail_items = build_metric_items(
+        text,
+        payload.get("context_details") or {},
+        payload.get("patterns_details") or {},
+    )
     return render_template(
         "result.html",
         text=text,
@@ -330,6 +417,8 @@ def result(token):
         patterns=payload["patterns"],
         tone=payload["tone"],
         score=payload["score"],
+        context_detail_items=context_detail_items,
+        pattern_detail_items=pattern_detail_items,
         backend_error=CLAIMEAI_ERROR,
     )
 

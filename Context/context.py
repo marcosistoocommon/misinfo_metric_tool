@@ -94,7 +94,17 @@ def _score_context_data(context):
         + recent_tweets_score * weights[5]
     ) / sum(weights)
 
-    return total_score
+    return {
+        "score": total_score,
+        "details": {
+            "profile_pic": pfp_score,
+            "name": name_score,
+            "description": description_score,
+            "friends": mutual_followers_score,
+            "last_posts": last_posts_score,
+            "recent": recent_tweets_score,
+        },
+    }
 
 
 def analyze_x_url(url, progress_callback=None):
@@ -115,13 +125,15 @@ def analyze_x_url(url, progress_callback=None):
                 progress_callback("extracting_context")
 
             context = extract_x_status_context(url)
+            context_result = _score_context_data(context)
             tweet_text = context["tweet"].get("text") if isinstance(context.get("tweet"), dict) else None
             if not tweet_text:
                 raise ValueError("Could not extract tweet text from the provided X URL.")
 
             return {
                 "message": tweet_text,
-                "context": _score_context_data(context),
+                "context": context_result["score"],
+                "context_details": context_result["details"],
                 "tweet": context["tweet"],
                 "profile": context["profile"],
                 "raw_context": context,

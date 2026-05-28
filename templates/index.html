@@ -56,17 +56,18 @@
 
     <div id="loading-overlay" class="loading-overlay" aria-hidden="true">
       <div class="loading-card">
-        <div class="spinner"></div>
         <h2>{{ text.loading_title }}</h2>
         <p>{{ text.loading_subtitle }}</p>
 
-        <div class="loading-steps" aria-live="polite">
-          {% for step in text.steps %}
-          <div class="loading-step{% if loop.first %} is-active{% endif %}" data-step-index="{{ loop.index0 }}">
-            <span class="step-dot"></span>
-            <span class="step-text">{{ step }}</span>
+        <div class="loading-progress" aria-live="polite">
+          <div class="loading-progress__meta">
+            <span class="loading-progress__phase" id="loading-progress-phase">{{ text.steps[0] }}</span>
+            <span class="loading-progress__value" id="loading-progress-value">0%</span>
           </div>
-          {% endfor %}
+          <div class="loading-progress__track" id="loading-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="{{ text.loading_title }}">
+            <div class="loading-progress__fill" id="loading-progress-fill"></div>
+          </div>
+          <p class="loading-progress__detail" id="loading-progress-detail">{{ text.loading_segments[0][0] }}</p>
         </div>
       </div>
     </div>
@@ -76,7 +77,28 @@
       const overlay = document.getElementById('loading-overlay');
       const languageSelect = document.getElementById('language');
       const languageInput = document.getElementById('lang-input');
-      const loadingSteps = Array.from(document.querySelectorAll('.loading-step'));
+      const loadingProgressTrack = document.getElementById('loading-progress-track');
+      const loadingProgressFill = document.getElementById('loading-progress-fill');
+      const loadingProgressPhase = document.getElementById('loading-progress-phase');
+      const loadingProgressValue = document.getElementById('loading-progress-value');
+      const loadingProgressDetail = document.getElementById('loading-progress-detail');
+      const loadingLabels = {{ text.steps | tojson }};
+      const loadingSegments = {{ text.loading_segments | tojson }};
+      const loadingRanges = [
+        { start: 4, end: 55, duration: 120000 },
+        { start: 55, end: 70, duration: 25000 },
+        { start: 70, end: 80, duration: 18000 },
+        { start: 80, end: 90, duration: 14000 },
+        { start: 90, end: 97, duration: 9000 },
+        { start: 97, end: 100, duration: 6000 },
+      ];
+      const loadingState = {
+        currentStep: 0,
+        stepStartedAt: Date.now(),
+        displayedPercent: 4,
+        done: false,
+      };
+      let progressTicker = null;
       const errorFields = {
         x_url: document.getElementById('x-url-error'),
       };
@@ -97,11 +119,63 @@
         });
       };
 
-      const showLoadingStep = (index, done = false) => {
-        loadingSteps.forEach((step, stepIndex) => {
-          step.classList.toggle('is-complete', done || stepIndex < index);
-          step.classList.toggle('is-active', !done && stepIndex === index);
-        });
+      const getCurrentRange = () => loadingRanges[Math.min(loadingState.currentStep, loadingRanges.length - 1)];
+
+      const getActiveSegment = () => {
+        const segments = loadingSegments[loadingState.currentStep] || [];
+        if (!segments.length) {
+          return '';
+        }
+
+        const range = getCurrentRange();
+        const elapsed = Date.now() - loadingState.stepStartedAt;
+        const ratio = Math.min(0.999, elapsed / range.duration);
+        const segmentIndex = Math.min(segments.length - 1, Math.floor(ratio * segments.length));
+        return segments[segmentIndex];
+      };
+
+      const renderLoadingProgress = () => {
+        const range = getCurrentRange();
+        const elapsed = Date.now() - loadingState.stepStartedAt;
+        const ratio = loadingState.done ? 1 : Math.min(1, elapsed / range.duration);
+        const targetPercent = loadingState.done ? 100 : range.start + ((range.end - range.start) * ratio);
+
+        loadingState.displayedPercent += (targetPercent - loadingState.displayedPercent) * 0.12;
+        if (loadingState.done) {
+          loadingState.displayedPercent = 100;
+        }
+
+        const percent = Math.max(0, Math.min(100, loadingState.displayedPercent));
+        const roundedPercent = Math.round(percent);
+
+        loadingProgressFill.style.width = `${percent}%`;
+        loadingProgressTrack.setAttribute('aria-valuenow', String(roundedPercent));
+        loadingProgressValue.textContent = `${roundedPercent}%`;
+        loadingProgressPhase.textContent = loadingLabels[loadingState.currentStep] || loadingLabels[loadingLabels.length - 1];
+        loadingProgressDetail.textContent = getActiveSegment() || loadingLabels[loadingState.currentStep] || '';
+      };
+
+      const showLoadingProgress = (index, done = false) => {
+        if (index !== loadingState.currentStep) {
+          loadingState.currentStep = index;
+          loadingState.stepStartedAt = Date.now();
+        }
+
+        loadingState.done = done;
+        renderLoadingProgress();
+      };
+
+      const startProgressTicker = () => {
+        if (!progressTicker) {
+          progressTicker = window.setInterval(renderLoadingProgress, 120);
+        }
+      };
+
+      const stopProgressTicker = () => {
+        if (progressTicker) {
+          window.clearInterval(progressTicker);
+          progressTicker = null;
+        }
       };
 
       const sleep = (duration) => new Promise((resolve) => window.setTimeout(resolve, duration));
@@ -119,9 +193,10 @@
             throw new Error(payload.error);
           }
 
-          showLoadingStep(payload.current_step, payload.done);
+          showLoadingProgress(payload.current_step, payload.done);
 
           if (payload.done) {
+            stopProgressTicker();
             window.location.href = payload.redirect;
             return;
           }
@@ -142,7 +217,12 @@
         languageInput.value = languageSelect.value;
         document.body.classList.add('is-loading');
         overlay.classList.add('is-visible');
-        showLoadingStep(0);
+        loadingState.currentStep = 0;
+        loadingState.stepStartedAt = Date.now();
+        loadingState.displayedPercent = 4;
+        loadingState.done = false;
+        startProgressTicker();
+        showLoadingProgress(0, false);
 
         const formData = new FormData(form);
 
@@ -158,6 +238,7 @@
           const payload = await response.json();
 
           if (!response.ok) {
+            stopProgressTicker();
             document.body.classList.remove('is-loading');
             overlay.classList.remove('is-visible');
             if (payload.errors) {
@@ -173,9 +254,10 @@
             return;
           }
 
-          showLoadingStep(payload.current_step ?? 0, false);
+          showLoadingProgress(payload.current_step ?? 0, false);
           await pollProgress(payload.status_url);
         } catch (error) {
+          stopProgressTicker();
           document.body.classList.remove('is-loading');
           overlay.classList.remove('is-visible');
           errorFields.x_url.textContent = error.message || 'Unable to complete the analysis.';
