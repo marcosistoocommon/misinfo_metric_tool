@@ -77,13 +77,12 @@ def analyze_message(input_text, context, debug=False, progress_callback=None):
     produce a single `payload` dictionary containing the overall score
     and component values. When `debug=True` the `details` dict is included.
     """
-
+    input_text = translate_and_preprocess(input_text)
     if debug:
         patterns_score, tone_score, details = patterns_and_tone_score(input_text, debug=True, progress_callback=progress_callback)
     else:
         patterns_score, tone_score = patterns_and_tone_score(input_text, progress_callback=progress_callback)
         details = None
-    input_text = translate_and_preprocess(input_text)
     verification_value = false_confidence(input_text, progress_callback=progress_callback)
 
     if progress_callback:

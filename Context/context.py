@@ -20,6 +20,7 @@ from politic_eval import handle_politicalness
 from recent_eval import evaluate_event_recency
 from Claims.verification import ClaimeAIError, false_confidence, initialize_agent
 from misinfo_value import patterns_and_tone_score
+from translate import translate_and_preprocess
 
 weights = [0.05, 0.05, 0.2, 0.3, 0.3, 0.1]
 
@@ -50,6 +51,7 @@ def _score_context_data(context):
     profile_pic = profile.get("profile_pic")
     username = profile.get("username")
     description = profile.get("description")
+    description = translate_and_preprocess(description) if description else None
 
     if profile_pic:
         pfp_score = evaluate_political_imagery(profile_pic)
@@ -62,7 +64,7 @@ def _score_context_data(context):
         follower_profile_pic = follower.get("profile_pic")
         follower_username = follower.get("username")
         follower_description = follower.get("description")
-
+        follower_description = translate_and_preprocess(follower_description) if follower_description else None
         if follower_profile_pic:
             mutual_followers_score += evaluate_political_imagery(follower_profile_pic) * 0.25
         if follower_username:
@@ -74,7 +76,7 @@ def _score_context_data(context):
         mutual_followers_score /= (len(context["mutual_followers"]) * 3)
 
     for post in context["last_posts"]:
-
+        post=translate_and_preprocess(post)
         pattern_score, tone_score = patterns_and_tone_score(post)
         fakeness_score = false_confidence(post)
         last_posts_score += (pattern_score * 0.5) + (tone_score * 0.15) + (fakeness_score * 0.35)
@@ -83,6 +85,7 @@ def _score_context_data(context):
 
     tweet_text = context["tweet"].get("text") if isinstance(context.get("tweet"), dict) else None
     if tweet_text:
+        tweet_text = translate_and_preprocess(tweet_text)
         recent_tweets_score = evaluate_event_recency(tweet_text)
 
     total_score = (
