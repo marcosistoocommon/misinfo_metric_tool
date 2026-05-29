@@ -17,6 +17,9 @@ from tavily import TavilyClient
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_RECENT_DAYS = 7
 DEFAULT_MAX_RESULTS = 2
+MAX_SEARCH_QUERY_LENGTH = 400
+SEARCH_QUERY_PREFIX = "Is this event recent? "
+SEARCH_QUERY_SUFFIX = "..."
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
@@ -29,7 +32,14 @@ def _require_api_key(value: str | None, name: str) -> str:
 
 def _build_search_query(event_description: str) -> str:
 	cleaned = " ".join(event_description.split())
-	return f'Is this event recent? {cleaned}'
+	if not cleaned:
+		return SEARCH_QUERY_PREFIX.rstrip()
+
+	max_body_length = MAX_SEARCH_QUERY_LENGTH - len(SEARCH_QUERY_PREFIX)
+	if len(cleaned) > max_body_length:
+		cleaned = cleaned[: max_body_length - len(SEARCH_QUERY_SUFFIX)].rstrip() + SEARCH_QUERY_SUFFIX
+
+	return f"{SEARCH_QUERY_PREFIX}{cleaned}"
 
 
 def _extract_search_context(search_result: dict[str, Any]) -> str:
