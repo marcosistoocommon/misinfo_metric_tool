@@ -79,7 +79,7 @@ def _score_context_data(context):
         post=translate_and_preprocess(post)
         pattern_score, tone_score = patterns_and_tone_score(post)
         fakeness_score = false_confidence(post)
-        last_posts_score += (pattern_score * 0.5) + (tone_score * 0.15) + (fakeness_score * 0.35)
+        last_posts_score += (pattern_score * 0.5) + (tone_score * 0.2) + (fakeness_score * 0.3)
     if context["last_posts"]:
         last_posts_score /= len(context["last_posts"])
 
