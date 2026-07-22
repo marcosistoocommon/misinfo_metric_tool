@@ -184,8 +184,8 @@ To use the tool, follow these steps:
 
 The final misinformation risk score is calculated by combining four main components:
 
-- Pattern analysis: 45%
-- Tone analysis: 15%
+- Pattern analysis: 40%
+- Tone analysis: 20%
 - Context analysis: 10%
 - Claim verification: 30%
 
