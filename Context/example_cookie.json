@@ -1,0 +1,5 @@
+[
+  { "username": "X_USERNAME", "cookies": { "auth_token": "X_TOKEN" }, "proxy": "PROXY_URL_(OPTIONAL)" }
+]
+
+ 

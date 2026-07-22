@@ -13,7 +13,6 @@ from Claims.verification import ClaimeAIError, initialize_agent
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
 
 CLAIMEAI_ERROR = None
 
