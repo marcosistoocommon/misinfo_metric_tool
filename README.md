@@ -47,7 +47,7 @@ The system analyzes social media content using several complementary components:
 * **Context analysis** to incorporate information surrounding the original post.
 * **Misinformation scoring** to aggregate the different analytical signals into a final risk score.
 
-![System Architecture](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/mermaid_diagram.png)
+![System Architecture](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/mermaid-diagram.png)
 
 The resulting score is intended to serve as an analytical indicator of potential misinformation risk. It should not be interpreted as an absolute determination of whether a statement is objectively true or false.
 
