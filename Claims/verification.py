@@ -226,3 +226,12 @@ def _map_verdict_to_false_confidence(verdict: Any) -> float:
 	if normalized in {"supported", "true"}:
 		return 0.0
 	return 0.4  # Uncertain or unknown verdicts get a moderate false confidence
+
+if __name__ == "__main__":
+	# Example usage
+	sample_text = input("Enter text to analyze for false confidence: ")
+	try:
+		confidence = false_confidence(sample_text)
+		print(f"False confidence for '{sample_text}': {confidence:.2f}")
+	except ClaimeAIError as e:
+		print(f"Error: {e}")

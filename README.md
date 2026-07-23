@@ -17,7 +17,7 @@ The objective is to provide a quantitative indicator that can support the analys
 - [Running the Application](#running-the-application)
 - [Using the Tool](#using-the-tool)
 - [Misinformation Metric](#misinformation-metric)
-- [Limitations](#limitations)
+- [Future Work](#future-work)
 - [Citation](#citation)
 - [License](#license)
 
@@ -34,7 +34,7 @@ The thesis proposes the design and development of a system that combines multipl
 * **Degree:** Bachelor's Degree in Telecommunications Technologies and Services Engineering
 * **Year:** 2026
 * **Supervisor:** Sonia Solera Cotanilla
-* **Thesis:** [Read the full thesis](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/memoria.pdf)
+* **Thesis:** [Read the full thesis](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/memoria.pdf)
 
 
 ## Project Overview
@@ -47,7 +47,7 @@ The system analyzes social media content using several complementary components:
 * **Context analysis** to incorporate information surrounding the original post.
 * **Misinformation scoring** to aggregate the different analytical signals into a final risk score.
 
-![System Architecture](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/mermaid-diagram.png)
+![System Architecture](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/mermaid-diagram.png)
 
 The resulting score is intended to serve as an analytical indicator of potential misinformation risk. It should not be interpreted as an absolute determination of whether a statement is objectively true or false.
 
@@ -56,10 +56,9 @@ The resulting score is intended to serve as an analytical indicator of potential
 * Analysis of social media posts and their context.
 * Claim extraction and verification.
 * Detection of linguistic and rhetorical patterns associated with misinformation.
-* Analysis of bias, propaganda, fallacies, emotion, hate speech, and violence.
 * Tone analysis.
 * Web-based prototype for interactive analysis.
-* Support for English and Spanish interfaces.
+* Support for English and Spanish languages.
 * Modular architecture allowing individual analysis components to be evaluated independently.
 
 ## Repository Structure
@@ -71,7 +70,7 @@ The resulting score is intended to serve as an analytical indicator of potential
 ├── Context/             # Context retrieval and analysis
 ├── Patterns/            # Linguistic and rhetorical pattern detectors
 ├── Tone/                # Tone analysis
-├── _docs/               # Thesis documentation
+├── docs/               # Thesis documentation
 ├── app.py               # Flask web application
 ├── misinfo_value.py     # Misinformation score aggregation
 ├── translate.py         # Translation and language-processing utilities
@@ -150,7 +149,7 @@ Follow the official documentation for the current account and cookie setup proce
 
 **scweet documentation:** https://github.com/Alir3z4/scweet
 
-After completing the `twscrape` setup, ensure that the required `cookies.json` file is available in the location expected by the project before running the web application or analysis pipeline.
+After completing the setup, ensure that the required `cookies.json` file is available in the location expected by the project before running the web application or analysis pipeline.
 
 > **Important:** X/Twitter scraping depends on the availability and behavior of the platform and the libraries. Changes to X/Twitter authentication or platform restrictions may require changes to the scraping configuration.
 
@@ -166,11 +165,17 @@ The application will display the local address in the terminal. Open this addres
 
 The web prototype allows users to submit an X/Twitter post for analysis and view the resulting misinformation risk assessment and its individual analytical components.
 
-![Home screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/in.png)
+![Home screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/in.png)
 
-![Loading screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/in2.png)
+![Loading screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/in2.png)
 
-![Results screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/in3.png)
+![Results screen screenshot](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/in3.png)
+
+Also, individual testing of the different analysis components can be performed. To do this, run the individual `component.py` script for the desired component, providing the required input parameters. For example:
+
+```bash
+python Patterns/emotion.py
+```
 
 ## Using the Tool
 
@@ -193,20 +198,17 @@ The resulting score provides an aggregated indication of the potential misinform
 
 The metric is designed to combine multiple signals rather than relying on a single classifier or characteristic.
 
-## Limitations
+For more details on the methodology and calculation of the misinformation metric, please refer to the thesis documentation in the [`docs`](https://github.com/marcosistoocommon/misinfo_metric_tool/tree/main/docs) directory.
 
-The misinformation score produced by this system should be interpreted as an analytical risk indicator rather than a definitive judgment of factual truth.
+## Future Work
 
-The system's results may be affected by:
+The current implementation is a research prototype and has several limitations. Future work could focus on:
 
-- The availability and quality of external information sources.
-- Errors in automated claim extraction and verification.
-- Limitations of the underlying language models.
-- The quality and completeness of contextual information.
-- Changes to X/Twitter's platform and scraping mechanisms.
-- Language-dependent differences in model performance.
+- Improving the resource management and performance of the system to handle larger datasets and more complex analyses.  
+- Developing multimodal analysis capabilities to incorporate images, videos, and other media types.
+- Including the development of own models to increase accuracy and reduce dependency on external services.
+- Using machine learning techniques to improve the accuracy of the misinformation metric and adapt to evolving patterns of misinformation.
 
-The system is intended to support the analysis and prioritization of potentially misleading content, not to replace expert fact-checking or human judgment.
 
 ## Citation
 
@@ -214,7 +216,7 @@ If you use this project or its methodology in academic work, please cite the ass
 
 > Marcos Pérez. *Diseño y Desarrollo de un Sistema para el Análisis y Detección de Campañas de Desinformación en Redes Sociales*. Bachelor's Degree in Telecommunications Technologies and Services Engineering, 2026.
 
-The full thesis is available in the [`_docs`](./_docs/) directory or [online](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/_docs/memoria.pdf).
+The full thesis is available in the [`docs`](./docs/) directory or [online](https://github.com/marcosistoocommon/misinfo_metric_tool/blob/main/docs/memoria.pdf).
 
 ## License
 This project is licensed under the **MIT** License. 
